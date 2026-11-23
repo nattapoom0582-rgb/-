@@ -1,0 +1,2158 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>โครงการอันเนื่องมาจากพระราชดำริ ในเขตจังหวัดอุตรดิตถ์ (ด้านแหล่งน้ำ)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Prompt & Sarabun -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet.js CSS & JS for Interactive Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Sarabun', 'sans-serif'],
+                        heading: ['Prompt', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+        .font-heading {
+            font-family: 'Prompt', sans-serif;
+        }
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px -5px rgba(15, 41, 74, 0.1), 0 8px 10px -6px rgba(15, 41, 74, 0.05);
+        }
+        /* Leaflet Custom Map Styles */
+        #projectMap {
+            z-index: 10;
+        }
+        .leaflet-popup-content-wrapper {
+            border-radius: 1rem !important;
+            padding: 0.25rem !important;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
+        }
+        .leaflet-popup-content {
+            font-family: 'Sarabun', sans-serif !important;
+            margin: 12px 14px !important;
+        }
+        .map-picking-cursor {
+            cursor: crosshair !important;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col">
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Top Admin Bar (Visible when Admin Mode is ON) -->
+    <div id="adminBanner" class="hidden bg-amber-500 text-slate-950 px-4 py-2.5 shadow-md sticky top-0 z-50 border-b border-amber-600">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2 font-heading font-semibold text-sm">
+                <span class="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping"></span>
+                <i class="fa-solid fa-user-shield"></i>
+                <span>กำลังใช้งานโหมดผู้ดูแลระบบ (Admin Mode) — คลิกขวาบนแผนที่เพื่อปักหมุดเพิ่มโครงการ หรือลากหมุดเพื่อย้ายจุดได้ทันที</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="openProjectModal()" class="px-3 py-1.5 bg-[#0f294a] hover:bg-blue-900 text-white rounded-lg text-xs font-heading font-medium transition flex items-center gap-1.5 shadow-xs">
+                    <i class="fa-solid fa-plus"></i> เพิ่มโครงการใหม่
+                </button>
+                <button onclick="openCategoryManagerModal()" class="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-xs font-heading font-medium transition flex items-center gap-1.5 shadow-xs">
+                    <i class="fa-solid fa-tags"></i> จัดการหมวดหมู่
+                </button>
+                <button onclick="openStatsModal()" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-900 rounded-lg text-xs font-heading font-medium transition flex items-center gap-1.5 shadow-xs">
+                    <i class="fa-solid fa-chart-simple"></i> แก้ไขตัวเลขสถิติ
+                </button>
+                <button onclick="exportDataJSON()" class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-heading font-medium transition flex items-center gap-1.5 shadow-xs" title="สำรองข้อมูลเป็นไฟล์ JSON">
+                    <i class="fa-solid fa-download"></i> Export JSON
+                </button>
+                <label class="px-3 py-1.5 bg-sky-700 hover:bg-sky-800 text-white rounded-lg text-xs font-heading font-medium transition flex items-center gap-1.5 shadow-xs cursor-pointer" title="นำเข้าข้อมูลจากไฟล์ JSON">
+                    <i class="fa-solid fa-upload"></i> Import
+                    <input type="file" id="importJsonInput" accept=".json" class="hidden" onchange="importDataJSON(event)">
+                </label>
+                <button onclick="confirmResetDefault()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-heading font-medium transition flex items-center gap-1.5 shadow-xs" title="คืนค่าข้อมูลตั้งต้นจากอินโฟกราฟิก">
+                    <i class="fa-solid fa-rotate-left"></i> รีเซ็ตเริ่มต้น
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Royal / Irrigation Header Banner -->
+    <header class="bg-gradient-to-r from-[#0a1f3d] via-[#133b6e] to-[#0b6e75] text-white shadow-lg relative overflow-hidden">
+        <div class="absolute inset-0 opacity-10 pointer-events-none">
+            <svg class="w-full h-full" viewBox="0 0 1440 320" preserveAspectRatio="none">
+                <path fill="#ffffff" fill-opacity="1" d="M0,192L48,197.3C96,203,192,213,288,229.3C384,245,480,267,576,250.7C672,235,768,181,864,181.3C960,181,1056,235,1152,234.7C1248,235,1344,181,1392,154.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+            </svg>
+        </div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 relative z-10">
+            <div class="flex justify-end mb-4">
+                <button id="adminToggleBtn" onclick="handleAdminToggle()" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/30 text-xs sm:text-sm font-heading font-medium text-white transition shadow-sm">
+                    <i class="fa-solid fa-lock text-amber-300" id="adminLockIcon"></i>
+                    <span id="adminBtnText">เข้าสู่โหมดแอดมิน</span>
+                </button>
+            </div>
+
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="flex items-center gap-4 text-center md:text-left">
+                    <!-- Emblem Upload & Auto-Save Box -->
+                    <div class="flex flex-col items-center gap-1.5 shrink-0">
+                        <div class="relative group w-20 h-24 sm:w-24 sm:h-28 rounded-2xl bg-white backdrop-blur-md border border-amber-400/60 p-1.5 flex items-center justify-center shadow-md overflow-hidden">
+                            <img id="emblemImg" src="3c4b4ea4-5f2f-4a5b-ad30-452f1aac3aa1_3.jpg" alt="ตราสัญลักษณ์กรมชลประทาน" onerror="handleEmblemError(this)" class="w-full h-full object-contain">
+                            <label title="คลิกเพื่ออัปโหลดและบันทึกรูปอัตโนมัติ" class="absolute inset-0 bg-slate-900/75 text-white text-[11px] font-heading flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition cursor-pointer">
+                                <i class="fa-solid fa-camera text-amber-300 text-base"></i>
+                                <span>อัปโหลดรูป</span>
+                                <input type="file" id="emblemUploadInput" accept="image/*" class="hidden" onchange="handleEmblemUpload(event)">
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-1.5 admin-only-el hidden">
+                            <label class="px-2 py-0.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded text-[10px] font-heading font-semibold cursor-pointer transition">
+                                <i class="fa-solid fa-upload"></i> เปลี่ยนรูป
+                                <input type="file" accept="image/*" class="hidden" onchange="handleEmblemUpload(event)">
+                            </label>
+                            <button type="button" onclick="resetEmblemImage()" class="px-2 py-0.5 bg-white/15 hover:bg-white/25 text-white rounded text-[10px] font-heading transition" title="คืนค่ารูปเริ่มต้น">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs sm:text-sm font-heading mb-2">
+                            <i class="fa-solid fa-landmark"></i> โครงการชลประทานอุตรดิตถ์ กรมชลประทาน
+                        </div>
+                        <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold font-heading tracking-wide text-white drop-shadow-sm">
+                            โครงการอันเนื่องมาจากพระราชดำริ ในเขตจังหวัดอุตรดิตถ์
+                        </h1>
+                        <p class="text-cyan-100 text-sm sm:text-base mt-1 font-light">
+                            ด้านพัฒนาแหล่งน้ำและการชลประทานเพื่อประโยชน์สุขของราษฎรจังหวัดอุตรดิตถ์
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 sm:px-6 text-center shrink-0">
+                    <p class="text-xs text-cyan-200 uppercase tracking-wider font-heading">ภาพรวมโครงการด้านแหล่งน้ำ</p>
+                    <div class="flex items-baseline justify-center gap-2 mt-1">
+                        <span id="headerTotalCount" class="text-3xl sm:text-4xl font-bold font-heading text-amber-300">37</span>
+                        <span class="text-sm text-white">โครงการทั้งหมด</span>
+                    </div>
+                    <div class="flex items-center justify-center gap-3 mt-2 text-xs">
+                        <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/30 border border-emerald-400/40 text-emerald-200">
+                            <i class="fa-solid fa-circle-check mr-1"></i>ดำเนินการแล้ว <span id="headerCompletedCount">35</span>
+                        </span>
+                        <span class="px-2.5 py-0.5 rounded-full bg-amber-500/30 border border-amber-400/40 text-amber-200">
+                            <i class="fa-solid fa-clock mr-1"></i>อยู่ในแผนฯ <span id="headerPlannedCount">2</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- Section 1: Dashboard Summary & Benefits -->
+        <section aria-label="สรุปสถิติและประโยชน์ที่ได้รับ">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg sm:text-xl font-bold font-heading text-[#0f294a] flex items-center gap-2">
+                    <span class="w-1.5 h-6 bg-amber-500 rounded-full inline-block"></span>
+                    สรุปภาพรวมและประโยชน์ที่ได้รับ (โครงการที่ดำเนินการแล้วเสร็จ)
+                </h2>
+                <button onclick="openStatsModal()" class="admin-only-el hidden text-xs font-heading font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg border border-amber-300 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-pen-to-square"></i> แก้ไขตัวเลขสถิติ
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80 card-hover relative overflow-hidden">
+                    <div class="absolute right-0 top-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
+                    <div class="relative z-10">
+                        <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center mb-3">
+                            <i class="fa-solid fa-layer-group text-lg"></i>
+                        </div>
+                        <p class="text-sm text-slate-500 font-medium">โครงการทั้งหมด</p>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <h3 id="statTotalProjects" class="text-3xl font-bold font-heading text-[#0f294a]">37</h3>
+                            <span class="text-sm text-slate-600">โครงการ</span>
+                        </div>
+                        <p class="text-xs text-emerald-600 mt-2 font-medium">
+                            <i class="fa-solid fa-check-double mr-1"></i>แล้วเสร็จ <span id="statCompletedText">35</span> | ในแผน <span id="statPlannedText">2</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80 card-hover relative overflow-hidden">
+                    <div class="absolute right-0 top-0 w-24 h-24 bg-cyan-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
+                    <div class="relative z-10">
+                        <div class="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center mb-3">
+                            <i class="fa-solid fa-droplet text-lg"></i>
+                        </div>
+                        <p class="text-sm text-slate-500 font-medium">ความจุเก็บกักน้ำประมาณ</p>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <h3 id="statCapacity" class="text-3xl font-bold font-heading text-cyan-800">75</h3>
+                            <span class="text-sm text-slate-600">ล้าน ลบ.ม.</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">
+                            เสริมความมั่นคงด้านน้ำอุปโภค-บริโภค
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80 card-hover relative overflow-hidden">
+                    <div class="absolute right-0 top-0 w-24 h-24 bg-emerald-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
+                    <div class="relative z-10">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3">
+                            <i class="fa-solid fa-seedling text-lg"></i>
+                        </div>
+                        <p class="text-sm text-slate-500 font-medium">พื้นที่รับประโยชน์</p>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <h3 id="statArea" class="text-3xl font-bold font-heading text-emerald-800">17,832</h3>
+                            <span class="text-sm text-slate-600">ไร่</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">
+                            สนับสนุนพื้นที่เกษตรกรรมในจังหวัด
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80 card-hover relative overflow-hidden">
+                    <div class="absolute right-0 top-0 w-24 h-24 bg-amber-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
+                    <div class="relative z-10">
+                        <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mb-3">
+                            <i class="fa-solid fa-house-user text-lg"></i>
+                        </div>
+                        <p class="text-sm text-slate-500 font-medium">ครัวเรือนที่ได้รับประโยชน์</p>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <h3 id="statHouseholds" class="text-3xl font-bold font-heading text-amber-800">5,229</h3>
+                            <span class="text-sm text-slate-600">ครัวเรือน</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">
+                            ยกระดับคุณภาพชีวิตราษฎรอย่างยั่งยืน
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Project Types Breakdown Bar -->
+            <div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200/80">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                    <div>
+                        <h3 class="font-heading font-semibold text-base text-[#0f294a]">
+                            <i class="fa-solid fa-chart-pie text-teal-600 mr-2"></i>ประเภทโครงการที่ดำเนินการแล้วเสร็จ (จำแนกตามลักษณะโครงสร้าง)
+                        </h3>
+                        <p class="text-xs text-slate-500">สัดส่วนประเภทแหล่งน้ำที่ก่อสร้างและปรับปรุงแล้วเสร็จในพื้นที่จังหวัดอุตรดิตถ์</p>
+                    </div>
+                    <div class="flex flex-wrap gap-3 text-xs sm:text-sm font-medium">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200">
+                            <span class="w-2.5 h-2.5 rounded-full bg-teal-500"></span> อ่างเก็บน้ำ: <strong id="statReservoirCount">9 โครงการ</strong>
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-50 text-pink-800 border border-pink-200">
+                            <span class="w-2.5 h-2.5 rounded-full bg-pink-500"></span> ฝาย: <strong id="statWeirCount">17 โครงการ</strong>
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 text-orange-800 border border-orange-200">
+                            <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span> โครงการอื่นๆ: <strong id="statOtherCount">5 โครงการ</strong>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="w-full h-4 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+                    <div id="barReservoir" class="bg-teal-500 h-full transition-all duration-500" style="width: 29%" title="อ่างเก็บน้ำ"></div>
+                    <div id="barWeir" class="bg-pink-500 h-full transition-all duration-500" style="width: 55%" title="ฝาย"></div>
+                    <div id="barOther" class="bg-orange-500 h-full transition-all duration-500" style="width: 16%" title="โครงการอื่นๆ"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Search & Filter Controls -->
+        <section aria-label="ค้นหาและตัวกรองข้อมูล" class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200/80 space-y-5">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <div class="md:col-span-6 relative">
+                    <label for="searchInput" class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 font-heading">
+                        ค้นหาชื่อโครงการ / ตำบล / อำเภอ
+                    </label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </span>
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            placeholder="พิมพ์คำค้นหา เช่น ห้วยน้ำรี, ท่าปลา, น้ำปาด, ฝาย, อ่างเก็บน้ำ..." 
+                            class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 focus:bg-white transition-all"
+                        >
+                        <button id="clearSearchBtn" class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600" title="ล้างคำค้นหา">
+                            <i class="fa-solid fa-circle-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
+                    <label for="districtFilter" class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 font-heading">
+                        กรองตามอำเภอ
+                    </label>
+                    <div class="relative">
+                        <select 
+                            id="districtFilter" 
+                            class="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 focus:bg-white transition-all cursor-pointer"
+                        >
+                            <option value="ALL">ทุกอำเภอในจังหวัดอุตรดิตถ์</option>
+                            <option value="ท่าปลา">อ.ท่าปลา</option>
+                            <option value="เมืองอุตรดิตถ์">อ.เมืองอุตรดิตถ์</option>
+                            <option value="น้ำปาด">อ.น้ำปาด</option>
+                            <option value="บ้านโคก">อ.บ้านโคก</option>
+                            <option value="ทองแสนขัน">อ.ทองแสนขัน</option>
+                            <option value="ฟากท่า">อ.ฟากท่า</option>
+                            <option value="ลับแล">อ.ลับแล</option>
+                            <option value="พิชัย">อ.พิชัย</option>
+                            <option value="ตรอน">อ.ตรอน</option>
+                        </select>
+                        <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 pointer-events-none">
+                            <i class="fa-solid fa-chevron-down text-xs"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="md:col-span-3">
+                    <label for="typeFilter" class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 font-heading">
+                        กรองตามประเภทแหล่งน้ำ
+                    </label>
+                    <div class="relative">
+                        <select 
+                            id="typeFilter" 
+                            class="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 focus:bg-white transition-all cursor-pointer"
+                        >
+                            <option value="ALL">ทุกประเภทแหล่งน้ำ</option>
+                            <option value="อ่างเก็บน้ำ">อ่างเก็บน้ำ</option>
+                            <option value="ฝาย">ฝาย</option>
+                            <option value="โครงการอื่นๆ">โครงการอื่นๆ (ขุดลอก/ประปา/ทำนบ)</option>
+                            <option value="อยู่ในแผนดำเนินการ">อยู่ในแผนดำเนินการ</option>
+                        </select>
+                        <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 pointer-events-none">
+                            <i class="fa-solid fa-chevron-down text-xs"></i>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Editable & Expandable Category Tabs Section -->
+            <div>
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider font-heading">
+                        เลือกดูตามหมวดหมู่โครงการพระราชดำริ
+                    </label>
+                    <div class="flex items-center gap-2 admin-only-el hidden">
+                        <button type="button" onclick="openCategoryManagerModal('NEW')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-lg text-xs font-heading font-semibold transition flex items-center gap-1">
+                            <i class="fa-solid fa-plus"></i> เพิ่มหมวดหมู่
+                        </button>
+                        <button type="button" onclick="openCategoryManagerModal('MANAGE')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-heading font-semibold transition flex items-center gap-1">
+                            <i class="fa-solid fa-pen-to-square"></i> แก้ไขหมวดหมู่
+                        </button>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2" id="categoryTabs">
+                    <!-- Rendered dynamically by renderCategoryTabs() -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Result Count & Reset Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+            <p class="text-sm text-slate-600 font-medium" id="resultSummary">
+                กำลังแสดงข้อมูลทั้งหมด <span class="font-bold text-[#0f294a]">39</span> รายการ
+            </p>
+            <div class="flex items-center gap-2">
+                <button onclick="openProjectModal()" class="admin-only-el hidden text-xs sm:text-sm text-white bg-[#0f294a] hover:bg-blue-900 font-heading font-medium flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg shadow-xs transition">
+                    <i class="fa-solid fa-plus"></i> เพิ่มโครงการใหม่
+                </button>
+                <button id="resetAllBtn" class="hidden text-xs sm:text-sm text-teal-700 hover:text-teal-900 font-semibold flex items-center gap-1.5 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-200 transition">
+                    <i class="fa-solid fa-rotate-left"></i> ล้างตัวกรองทั้งหมด
+                </button>
+            </div>
+        </div>
+
+        <!-- Section 3 (Moved Directly Below Search): Planned Projects Container -->
+        <div id="plannedProjectsContainer" class="space-y-8"></div>
+
+        <!-- Section 4 (Moved Directly Below Planned Projects): Interactive Map Section -->
+        <section id="mapSection" aria-label="แผนที่แสดงตำแหน่งโครงการ" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+            <div class="p-4 sm:p-5 bg-gradient-to-r from-slate-50 to-cyan-50/50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-bold font-heading text-[#0f294a] flex items-center gap-2">
+                        <i class="fa-solid fa-map-location-dot text-teal-600"></i>
+                        แผนที่แสดงโครงการอันเนื่องมาจากพระราชดำริ ในเขตจังหวัดอุตรดิตถ์
+                    </h2>
+                    <p class="text-xs sm:text-sm text-slate-500 mt-0.5">
+                        คลิกที่หมุดเพื่อดูรายละเอียดโครงการ หรือกดปุ่ม <strong>"ดูบนแผนที่"</strong> จากรายการโครงการเพื่อเลื่อนไปยังตำแหน่งโครงการ
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="inline-flex rounded-xl bg-slate-200/80 p-1 text-xs font-heading font-medium">
+                        <button id="btnStreetMap" onclick="switchBaseMap('street')" class="px-3 py-1.5 rounded-lg bg-white text-[#0f294a] shadow-xs transition">
+                            <i class="fa-solid fa-map mr-1"></i> แผนที่ถนน
+                        </button>
+                        <button id="btnSatMap" onclick="switchBaseMap('satellite')" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">
+                            <i class="fa-solid fa-satellite mr-1"></i> ดาวเทียม
+                        </button>
+                    </div>
+
+                    <button onclick="fitMapToBounds()" class="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl text-xs font-heading font-medium transition flex items-center gap-1.5 shadow-2xs" title="ซูมดูภาพรวมทั้งจังหวัด">
+                        <i class="fa-solid fa-expand text-teal-600"></i> ภาพรวมจังหวัด
+                    </button>
+
+                    <button id="btnStartPinDrop" onclick="toggleQuickPinMode()" class="admin-only-el hidden px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-heading font-semibold transition flex items-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-location-crosshairs"></i> <span>ปักหมุดเพิ่มโครงการบนแผนที่</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="mapPickingBanner" class="hidden bg-amber-100 border-b border-amber-300 px-4 py-2.5 flex items-center justify-between text-xs sm:text-sm text-amber-950 font-heading">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-crosshairs text-amber-600 animate-spin"></i>
+                    <span id="mapPickingText"><strong>โหมดเลือกพิกัด:</strong> กรุณาคลิกจิ้มตำแหน่งบนแผนที่จังหวัดอุตรดิตถ์เพื่อกำหนดจุดตั้งโครงการ</span>
+                </div>
+                <button onclick="cancelMapPicking()" class="px-3 py-1 bg-white hover:bg-amber-50 border border-amber-400 rounded-lg text-xs font-semibold">
+                    ยกเลิก
+                </button>
+            </div>
+
+            <div class="relative w-full h-[420px] sm:h-[500px]">
+                <div id="projectMap" class="w-full h-full"></div>
+
+                <div class="absolute bottom-4 left-4 z-[400] bg-white/95 backdrop-blur-md p-3.5 rounded-xl shadow-lg border border-slate-200 max-w-[230px]">
+                    <p class="font-heading font-bold text-xs text-[#0f294a] mb-2 border-b border-slate-100 pb-1.5 flex items-center justify-between">
+                        <span>สัญลักษณ์โครงการ</span>
+                        <span id="mapVisibleCount" class="text-[11px] font-normal text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">39 จุด</span>
+                    </p>
+                    <ul class="space-y-1.5 text-xs text-slate-700">
+                        <li class="flex items-center gap-2">
+                            <span class="w-3.5 h-3.5 rounded-full bg-teal-500 border-2 border-white shadow-xs shrink-0"></span>
+                            <span>อ่างเก็บน้ำ</span>
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="w-3.5 h-3.5 rounded-full bg-pink-500 border-2 border-white shadow-xs shrink-0"></span>
+                            <span>ฝาย</span>
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="w-3.5 h-3.5 rounded-full bg-orange-500 border-2 border-white shadow-xs shrink-0"></span>
+                            <span>โครงการอื่นๆ (ขุดลอก/ประปา/ทำนบ)</span>
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="w-3.5 h-3.5 rounded-full bg-amber-400 border-2 border-slate-800 shadow-xs shrink-0"></span>
+                            <span>อยู่ในแผนดำเนินการ</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Categorized Project Lists Container -->
+        <div id="projectsContainer" class="space-y-8"></div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm">
+            <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-4">
+                <i class="fa-solid fa-folder-open text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-bold font-heading text-slate-700">ไม่พบข้อมูลโครงการที่ตรงกับเงื่อนไข</h3>
+            <p class="text-sm text-slate-500 mt-1 max-w-md mx-auto">
+                ลองเปลี่ยนคำค้นหา เลือกอำเภออื่น หรือกดปุ่มด้านล่างเพื่อแสดงโครงการทั้งหมดอีกครั้ง
+            </p>
+            <button onclick="resetFilters()" class="mt-4 px-5 py-2.5 bg-[#0f294a] text-white text-sm font-heading font-medium rounded-xl hover:bg-blue-900 transition shadow-sm">
+                แสดงโครงการทั้งหมด
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-[#0a1f3d] text-slate-300 py-8 mt-12 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs sm:text-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-amber-400">
+                    <i class="fa-solid fa-water"></i>
+                </div>
+                <div>
+                    <p class="font-heading font-semibold text-white">โครงการอันเนื่องมาจากพระราชดำริ ในเขตจังหวัดอุตรดิตถ์</p>
+                    <p class="text-slate-400 text-xs">ฐานข้อมูลสารสนเทศด้านแหล่งน้ำและระบบแผนที่ GIS จังหวัดอุตรดิตถ์</p>
+                </div>
+            </div>
+            <div class="text-slate-400 text-center sm:text-right">
+                <p>รองรับการบริหารจัดการข้อมูลโดยผู้ดูแลระบบ (Admin Mode)</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ========================================== -->
+    <!-- MODALS -->
+    <!-- ========================================== -->
+
+    <!-- 1. Admin Login Modal -->
+    <div id="adminLoginModal" class="hidden fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+                        <i class="fa-solid fa-user-shield text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-heading font-bold text-lg text-[#0f294a]">เข้าสู่ระบบผู้ดูแล (Admin)</h3>
+                        <p class="text-xs text-slate-500">เพื่อจัดการข้อมูลโครงการ หมวดหมู่ และปักหมุดแผนที่</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('adminLoginModal')" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form onsubmit="submitAdminLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">รหัสผ่านผู้ดูแลระบบ (รหัสทดสอบ: 1234)</label>
+                    <input type="password" id="adminPasswordInput" placeholder="กรอกรหัสผ่าน..." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <p id="loginErrorMsg" class="hidden text-xs text-rose-600 mt-1"><i class="fa-solid fa-circle-exclamation"></i> รหัสผ่านไม่ถูกต้อง (ลองใช้รหัส 1234)</p>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-2 pt-2">
+                    <button type="submit" class="flex-1 py-2.5 px-4 bg-[#0f294a] hover:bg-blue-900 text-white font-heading font-medium text-sm rounded-xl transition shadow-sm">
+                        เข้าสู่ระบบ
+                    </button>
+                    <button type="button" onclick="quickAdminLogin()" class="py-2.5 px-4 bg-amber-100 hover:bg-amber-200 text-amber-900 font-heading font-semibold text-sm rounded-xl border border-amber-300 transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-bolt"></i> ล็อกอินด่วน (ทดสอบ)
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. Category Manager Modal (Add / Edit / Delete Categories) -->
+    <div id="categoryManagerModal" class="hidden fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 my-8">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200 mb-5">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                        <i class="fa-solid fa-tags text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-heading font-bold text-lg text-[#0f294a]">เพิ่มและแก้ไขหมวดหมู่โครงการพระราชดำริ</h3>
+                        <p class="text-xs text-slate-500">ปรับชื่อปุ่มหมวดหมู่ สีจุดสัญลักษณ์ หรือสร้างหมวดหมู่ใหม่ได้ทันที</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('categoryManagerModal')" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Add / Edit Single Category Form -->
+            <form id="categoryForm" onsubmit="saveCategoryForm(event)" class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-5 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h4 id="catFormTitle" class="font-heading font-bold text-sm text-[#0f294a]">
+                        <i class="fa-solid fa-plus-circle text-indigo-600 mr-1"></i> เพิ่มหมวดหมู่ใหม่
+                    </h4>
+                    <button type="button" id="catFormCancelEditBtn" onclick="resetCategoryForm()" class="hidden text-xs text-slate-500 hover:text-slate-800 underline">
+                        ยกเลิกการแก้ไข / สร้างใหม่
+                    </button>
+                </div>
+
+                <input type="hidden" id="catEditingId">
+
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div class="sm:col-span-5">
+                        <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">ชื่อปุ่มหมวดหมู่ (แสดงบนแถบ) *</label>
+                        <input type="text" id="catShortTitle" required placeholder="เช่น ในหลวง ร.9 หรือ โครงการพิเศษ" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div class="sm:col-span-4">
+                        <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">สีสัญลักษณ์หมวดหมู่</label>
+                        <select id="catColorKey" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="amber">สีส้ม-ทอง (ในหลวง ร.9)</option>
+                            <option value="sky">สีฟ้าคราม (สมเด็จพระบรมราชชนนีพันปีหลวง)</option>
+                            <option value="yellow">สีเหลืองทอง (ในหลวง ร.10)</option>
+                            <option value="purple">สีม่วง (กรมสมเด็จพระเทพรัตนฯ)</option>
+                            <option value="emerald">สีเขียว (อยู่ในแผนดำเนินการ)</option>
+                            <option value="teal">สีเขียวอมฟ้า (Teal)</option>
+                            <option value="rose">สีชมพู-แดง (Rose)</option>
+                            <option value="blue">สีน้ำเงิน (Blue)</option>
+                        </select>
+                    </div>
+                    <div class="sm:col-span-3 flex items-end">
+                        <label class="inline-flex items-center gap-2 py-2 px-2.5 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 w-full cursor-pointer">
+                            <input type="checkbox" id="catIsPlanned" class="rounded text-emerald-600 focus:ring-emerald-500">
+                            <span>การ์ดแบบแผนงาน</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">ชื่อหัวข้อเต็ม (แสดงบนหัวกลุ่มรายการด้านล่าง)</label>
+                    <input type="text" id="catFullTitle" placeholder="หากเว้นว่าง ระบบจะใช้ชื่อปุ่มหมวดหมู่อัตโนมัติ" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div class="flex justify-end pt-1">
+                    <button type="submit" id="catSubmitBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-heading font-medium text-xs sm:text-sm rounded-lg transition shadow-xs flex items-center gap-1.5">
+                        <i class="fa-solid fa-check"></i> <span>เพิ่มหมวดหมู่</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Existing Categories List -->
+            <div>
+                <p class="text-xs font-heading font-bold text-slate-600 uppercase tracking-wider mb-2">
+                    รายการหมวดหมู่ทั้งหมด (คลิกแก้ไขเพื่อเปลี่ยนชื่อหรือสี)
+                </p>
+                <div id="categoryManageList" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    <!-- Rendered by JS -->
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 mt-4 border-t border-slate-200">
+                <button type="button" onclick="closeModal('categoryManagerModal')" class="px-4 py-2 bg-[#0f294a] hover:bg-blue-900 text-white rounded-xl text-sm font-heading font-medium">
+                    เสร็จสิ้น
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Add / Edit Project Modal -->
+    <div id="projectModal" class="hidden fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 my-8">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200 mb-5">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center">
+                        <i class="fa-solid fa-folder-plus text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 id="projectModalTitle" class="font-heading font-bold text-lg text-[#0f294a]">เพิ่มโครงการใหม่</h3>
+                        <p class="text-xs text-slate-500">ระบุรายละเอียดโครงการและพิกัดที่ตั้งในจังหวัดอุตรดิตถ์</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('projectModal')" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="projectForm" onsubmit="saveProjectForm(event)" class="space-y-4">
+                <input type="hidden" id="editProjectUid">
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">หมวดหมู่โครงการพระราชดำริ *</label>
+                        <select id="formCategory" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            <!-- Populated dynamically from categories -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">ลำดับที่ *</label>
+                        <input type="number" id="formOrder" min="1" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">ชื่อโครงการ *</label>
+                    <input type="text" id="formName" required placeholder="เช่น อ่างเก็บน้ำห้วยน้ำรีพร้อมระบบส่งน้ำ" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">ตำบล</label>
+                        <input type="text" id="formSubdistrict" placeholder="เช่น ต.จริม" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">อำเภอ *</label>
+                        <select id="formDistrict" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            <option value="เมืองอุตรดิตถ์">อ.เมืองอุตรดิตถ์</option>
+                            <option value="ท่าปลา">อ.ท่าปลา</option>
+                            <option value="น้ำปาด">อ.น้ำปาด</option>
+                            <option value="บ้านโคก">อ.บ้านโคก</option>
+                            <option value="ฟากท่า">อ.ฟากท่า</option>
+                            <option value="ลับแล">อ.ลับแล</option>
+                            <option value="ทองแสนขัน">อ.ทองแสนขัน</option>
+                            <option value="พิชัย">อ.พิชัย</option>
+                            <option value="ตรอน">อ.ตรอน</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">ประเภทโครงการ *</label>
+                        <select id="formTypeCategory" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            <option value="อ่างเก็บน้ำ">อ่างเก็บน้ำ</option>
+                            <option value="ฝาย">ฝาย</option>
+                            <option value="โครงการอื่นๆ">โครงการอื่นๆ (ขุดลอก/ประปา/ทำนบ)</option>
+                            <option value="อยู่ในแผนดำเนินการ">อยู่ในแผนดำเนินการ</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bg-cyan-50/70 border border-cyan-200 rounded-xl p-4 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <label class="text-xs font-heading font-bold text-cyan-950 flex items-center gap-1.5">
+                            <i class="fa-solid fa-location-dot text-rose-500"></i> พิกัดตำแหน่งบนแผนที่ (Latitude / Longitude)
+                        </label>
+                        <button type="button" onclick="pickLocationFromModal()" class="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-heading font-medium transition flex items-center gap-1.5 shadow-2xs">
+                            <i class="fa-solid fa-crosshairs"></i> คลิกเลือกจุดบนแผนที่
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] text-slate-600 mb-0.5">ละติจูด (Latitude)</label>
+                            <input type="number" step="any" id="formLat" required placeholder="17.6200" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-teal-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-600 mb-0.5">ลองจิจูด (Longitude)</label>
+                            <input type="number" step="any" id="formLng" required placeholder="100.0900" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-teal-500">
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">
+                        รายละเอียดเพิ่มเติม / ข้อมูลจำเพาะ (แยกแต่ละบรรทัด เช่น ความจุ, งบประมาณ, ปีงบประมาณ)
+                    </label>
+                    <textarea id="formDetails" rows="3" placeholder="เช่น&#10;อ่างเก็บน้ำความจุ 3.97 ล้านลูกบาศก์เมตร พร้อมระบบส่งน้ำ&#10;งบประมาณ 100 ล้านบาท&#10;อยู่ในแผนดำเนินการ ปี 2570" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                    <button type="button" onclick="closeModal('projectModal')" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-heading font-medium text-sm rounded-xl transition">
+                        ยกเลิก
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-heading font-medium text-sm rounded-xl transition shadow-sm flex items-center gap-1.5">
+                        <i class="fa-solid fa-floppy-disk"></i> บันทึกข้อมูลโครงการ
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4. Edit Dashboard Statistics Modal -->
+    <div id="statsModal" class="hidden fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
+                <h3 class="font-heading font-bold text-lg text-[#0f294a] flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-amber-500"></i> แก้ไขตัวเลขสรุปสถิติและประโยชน์ที่ได้รับ
+                </h3>
+                <button onclick="closeModal('statsModal')" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form onsubmit="saveStatsForm(event)" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">โครงการทั้งหมด (โครงการ)</label>
+                        <input type="number" id="editStatTotal" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">ดำเนินการแล้ว (โครงการ)</label>
+                        <input type="number" id="editStatCompleted" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">อยู่ในแผนดำเนินการ (โครงการ)</label>
+                        <input type="number" id="editStatPlanned" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">ความจุเก็บกัก (ล้าน ลบ.ม.)</label>
+                        <input type="number" step="any" id="editStatCapacity" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">พื้นที่รับประโยชน์ (ไร่)</label>
+                        <input type="number" id="editStatArea" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-heading font-semibold text-slate-700 mb-1">ครัวเรือนที่ได้รับประโยชน์</label>
+                        <input type="number" id="editStatHouseholds" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm">
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-100">
+                    <p class="text-xs font-heading font-semibold text-slate-600 mb-2">จำนวนโครงการแยกตามประเภทโครงสร้าง:</p>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[11px] text-slate-600 mb-1">อ่างเก็บน้ำ</label>
+                            <input type="number" id="editStatReservoir" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-600 mb-1">ฝาย</label>
+                            <input type="number" id="editStatWeir" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-600 mb-1">โครงการอื่นๆ</label>
+                            <input type="number" id="editStatOther" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                    <button type="button" onclick="closeModal('statsModal')" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-heading">ยกเลิก</button>
+                    <button type="submit" class="px-5 py-2 bg-[#0f294a] text-white rounded-xl text-sm font-heading font-medium">บันทึกสถิติ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 5. Custom Confirmation Modal -->
+    <div id="confirmModal" class="hidden fixed inset-0 z-[1100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-center">
+            <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-3">
+                <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+            </div>
+            <h3 id="confirmTitle" class="font-heading font-bold text-lg text-slate-800">ยืนยันการดำเนินการ</h3>
+            <p id="confirmMessage" class="text-sm text-slate-500 mt-1 mb-5">คุณต้องการดำเนินการนี้ใช่หรือไม่?</p>
+            <div class="flex gap-2">
+                <button onclick="closeModal('confirmModal')" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-heading font-medium text-sm rounded-xl transition">ยกเลิก</button>
+                <button id="confirmActionBtn" class="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-heading font-medium text-sm rounded-xl transition">ยืนยัน</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data & Application Logic -->
+    <script>
+        const STORAGE_KEY_PROJECTS = 'uttaradit_royal_projects_v2';
+        const STORAGE_KEY_STATS = 'uttaradit_royal_stats_v2';
+        const STORAGE_KEY_CATEGORIES = 'uttaradit_royal_categories_v1';
+        const STORAGE_KEY_EMBLEM = 'uttaradit_royal_emblem_v1';
+        const DEFAULT_EMBLEM_SRC = '3c4b4ea4-5f2f-4a5b-ad30-452f1aac3aa1_3.jpg';
+
+        const DEFAULT_STATS = {
+            totalProjects: 37,
+            completedProjects: 35,
+            plannedProjects: 2,
+            capacity: 75,
+            area: 17832,
+            households: 5229,
+            reservoirCount: 9,
+            weirCount: 17,
+            otherCount: 5
+        };
+
+        // Color Palette Presets for Categories
+        const COLOR_PRESETS = {
+            amber: {
+                dot: 'bg-amber-500',
+                tab: 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100',
+                pill: 'bg-amber-200/70 text-amber-900',
+                headerBg: 'bg-gradient-to-r from-amber-600 to-amber-500',
+                border: 'border-amber-200',
+                badgeBg: 'bg-amber-100 text-amber-900',
+                numberBg: 'bg-amber-500 text-white',
+                icon: 'fa-crown'
+            },
+            sky: {
+                dot: 'bg-sky-500',
+                tab: 'bg-sky-50 text-sky-900 border-sky-200 hover:bg-sky-100',
+                pill: 'bg-sky-200/70 text-sky-900',
+                headerBg: 'bg-gradient-to-r from-sky-600 to-cyan-600',
+                border: 'border-sky-200',
+                badgeBg: 'bg-sky-100 text-sky-900',
+                numberBg: 'bg-sky-600 text-white',
+                icon: 'fa-water'
+            },
+            yellow: {
+                dot: 'bg-yellow-500',
+                tab: 'bg-yellow-50 text-yellow-900 border-yellow-300 hover:bg-yellow-100',
+                pill: 'bg-yellow-200/80 text-yellow-900',
+                headerBg: 'bg-gradient-to-r from-yellow-600 to-amber-500',
+                border: 'border-yellow-300',
+                badgeBg: 'bg-yellow-100 text-yellow-900',
+                numberBg: 'bg-yellow-600 text-white',
+                icon: 'fa-sun'
+            },
+            purple: {
+                dot: 'bg-purple-600',
+                tab: 'bg-purple-50 text-purple-900 border-purple-200 hover:bg-purple-100',
+                pill: 'bg-purple-200/70 text-purple-900',
+                headerBg: 'bg-gradient-to-r from-indigo-700 to-purple-700',
+                border: 'border-purple-200',
+                badgeBg: 'bg-purple-100 text-purple-900',
+                numberBg: 'bg-purple-700 text-white',
+                icon: 'fa-droplet'
+            },
+            emerald: {
+                dot: 'bg-emerald-600',
+                tab: 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100',
+                pill: 'bg-emerald-200/70 text-emerald-900',
+                headerBg: 'bg-gradient-to-r from-emerald-700 to-teal-700',
+                border: 'border-emerald-300',
+                badgeBg: 'bg-emerald-100 text-emerald-900',
+                numberBg: 'bg-emerald-600 text-white',
+                icon: 'fa-calendar-check'
+            },
+            teal: {
+                dot: 'bg-teal-600',
+                tab: 'bg-teal-50 text-teal-900 border-teal-200 hover:bg-teal-100',
+                pill: 'bg-teal-200/70 text-teal-900',
+                headerBg: 'bg-gradient-to-r from-teal-700 to-cyan-700',
+                border: 'border-teal-200',
+                badgeBg: 'bg-teal-100 text-teal-900',
+                numberBg: 'bg-teal-600 text-white',
+                icon: 'fa-water'
+            },
+            rose: {
+                dot: 'bg-rose-500',
+                tab: 'bg-rose-50 text-rose-900 border-rose-200 hover:bg-rose-100',
+                pill: 'bg-rose-200/70 text-rose-900',
+                headerBg: 'bg-gradient-to-r from-rose-700 to-pink-600',
+                border: 'border-rose-200',
+                badgeBg: 'bg-rose-100 text-rose-900',
+                numberBg: 'bg-rose-600 text-white',
+                icon: 'fa-star'
+            },
+            blue: {
+                dot: 'bg-blue-600',
+                tab: 'bg-blue-50 text-blue-900 border-blue-200 hover:bg-blue-100',
+                pill: 'bg-blue-200/70 text-blue-900',
+                headerBg: 'bg-gradient-to-r from-blue-800 to-indigo-700',
+                border: 'border-blue-200',
+                badgeBg: 'bg-blue-100 text-blue-900',
+                numberBg: 'bg-blue-700 text-white',
+                icon: 'fa-landmark'
+            }
+        };
+
+        // Default Categories Ordered List
+        const DEFAULT_CATEGORIES = [
+            {
+                id: 'RAMA9',
+                title: 'โครงการพระราชดำริ พระบาทสมเด็จพระบรมชนกาธิเบศร มหาภูมิพลอดุลยเดชมหาราช บรมนาถบพิตร',
+                shortTitle: 'ในหลวง ร.9',
+                colorKey: 'amber',
+                isPlanned: false,
+                isDefault: true
+            },
+            {
+                id: 'QUEEN',
+                title: 'โครงการพระราชดำริ สมเด็จพระนางเจ้าสิริกิติ์ พระบรมราชินีนาถ พระบรมราชชนนีพันปีหลวง',
+                shortTitle: 'สมเด็จพระบรมราชชนนีพันปีหลวง',
+                colorKey: 'sky',
+                isPlanned: false,
+                isDefault: true
+            },
+            {
+                id: 'RAMA10',
+                title: 'โครงการพระราชดำริ พระบาทสมเด็จพระเจ้าอยู่หัว',
+                shortTitle: 'ในหลวง ร.10',
+                colorKey: 'yellow',
+                isPlanned: false,
+                isDefault: true
+            },
+            {
+                id: 'SIRINDHORN',
+                title: 'โครงการพระราชดำริ สมเด็จพระกนิษฐาธิราชเจ้า กรมสมเด็จพระเทพรัตนราชสุดา ฯ สยามบรมราชกุมารี',
+                shortTitle: 'กรมสมเด็จพระเทพรัตนฯ',
+                colorKey: 'purple',
+                isPlanned: false,
+                isDefault: true
+            },
+            {
+                id: 'PLANNED',
+                title: 'โครงการพระราชดำริ อยู่ในแผนดำเนินการ',
+                shortTitle: 'อยู่ในแผนดำเนินการ',
+                colorKey: 'emerald',
+                isPlanned: true,
+                isDefault: true
+            }
+        ];
+
+        // Complete Initial Dataset
+        const DEFAULT_PROJECTS = [
+            { uid: 'r9-1', category: 'RAMA9', order: 1, name: 'จัดหาน้ำสู่คลองท่าเรือเขื่อนสิริกิติ์ ท่อส่งน้ำจากเขื่อนสิริกิติ์', subdistrict: 'ต.ท่าปลา', district: 'ท่าปลา', typeCategory: 'โครงการอื่นๆ', lat: 17.7685, lng: 100.5582, details: [] },
+            { uid: 'r9-2', category: 'RAMA9', order: 2, name: 'จัดหาแหล่งน้ำช่วยเหลือราษฎรด้านน้ำที่ 1 บ้านน้ำพี้', subdistrict: 'ต.น้ำพี้', district: 'ทองแสนขัน', typeCategory: 'โครงการอื่นๆ', lat: 17.5245, lng: 100.3410, details: [] },
+            { uid: 'r9-3', category: 'RAMA9', order: 3, name: 'จัดหาแหล่งน้ำช่วยเหลือราษฎรด้านน้ำที่ 2 ขุดลอกลำห้วยปอบฯ', subdistrict: 'ต.ด่านน้ำพี้', district: 'ทองแสนขัน', typeCategory: 'โครงการอื่นๆ', lat: 17.5082, lng: 100.3655, details: [] },
+            { uid: 'r9-4', category: 'RAMA9', order: 4, name: 'อ่างเก็บน้ำร่องปู พร้อมระบบส่งน้ำ', subdistrict: 'ต.นาขุม', district: 'บ้านโคก', typeCategory: 'อ่างเก็บน้ำ', lat: 18.0215, lng: 101.0340, details: [] },
+            { uid: 'r9-5', category: 'RAMA9', order: 5, name: 'อ่างเก็บน้ำห้วยมะคำพร้อมระบบส่งน้ำ', subdistrict: 'ต.ม่วงเจ็ดต้น', district: 'บ้านโคก', typeCategory: 'อ่างเก็บน้ำ', lat: 17.9840, lng: 100.9925, details: [] },
+            { uid: 'r9-6', category: 'RAMA9', order: 6, name: 'ฝายห้วยพร้าวพร้อมระบบฯ', subdistrict: 'ต.นางพญา', district: 'ท่าปลา', typeCategory: 'ฝาย', lat: 17.8920, lng: 100.4615, details: [] },
+            { uid: 'r9-7', category: 'RAMA9', order: 7, name: 'ฝายห้วยพญาพร้อมระบบฯ', subdistrict: 'ต.นางพญา', district: 'ท่าปลา', typeCategory: 'ฝาย', lat: 17.9055, lng: 100.4780, details: [] },
+            { uid: 'r9-8', category: 'RAMA9', order: 8, name: 'ฝายห้วยดินแดง', subdistrict: 'ต.นางพญา', district: 'ท่าปลา', typeCategory: 'ฝาย', lat: 17.8760, lng: 100.4490, details: [] },
+            { uid: 'r9-9', category: 'RAMA9', order: 9, name: 'ฝายห้วยดำ 2 แห่ง พร้อมระบบฯ', subdistrict: 'ต.นางพญา', district: 'ท่าปลา', typeCategory: 'ฝาย', lat: 17.9180, lng: 100.4910, details: [] },
+            { uid: 'r9-10', category: 'RAMA9', order: 10, name: 'อ่างเก็บน้ำห้วยน้ำรี', subdistrict: 'ต.จริม', district: 'ท่าปลา', typeCategory: 'อ่างเก็บน้ำ', lat: 17.8240, lng: 100.5120, details: [] },
+
+            { uid: 'q-1', category: 'QUEEN', order: 1, name: 'จัดหาแหล่งน้ำเพื่อการเกษตรและปรับปรุงระบบประปาหมู่บ้าน', subdistrict: 'ต.นางพญา', district: 'ท่าปลา', typeCategory: 'โครงการอื่นๆ', lat: 17.9320, lng: 100.5050, details: [] },
+            { uid: 'q-2', category: 'QUEEN', order: 2, name: 'ปรับปรุงระบบส่งน้ำฝายสวนเมี่ยง บ้านห้วยต้า', subdistrict: 'ต.นางพญา', district: 'ท่าปลา', typeCategory: 'ฝาย', lat: 17.9485, lng: 100.5280, details: [] },
+
+            { uid: 'r10-1', category: 'RAMA10', order: 1, name: 'อ่างเก็บน้ำห้วยลึกพร้อมอาคารประกอบ', subdistrict: 'ต.สองห้อง', district: 'ฟากท่า', typeCategory: 'อ่างเก็บน้ำ', lat: 17.9650, lng: 100.8420, details: [] },
+
+            { uid: 's-1', category: 'SIRINDHORN', order: 1, name: 'อ่างเก็บน้ำห้วยผากทอง', subdistrict: 'ต.ห้วยมุ่น', district: 'น้ำปาด', typeCategory: 'อ่างเก็บน้ำ', lat: 17.7810, lng: 100.7850, details: [] },
+            { uid: 's-2', category: 'SIRINDHORN', order: 2, name: 'อ่างเก็บน้ำห้วยปิง', subdistrict: 'ต.ห้วยมุ่น', district: 'น้ำปาด', typeCategory: 'อ่างเก็บน้ำ', lat: 17.7950, lng: 100.8020, details: [] },
+            { uid: 's-3', category: 'SIRINDHORN', order: 3, name: 'ฝายตำบลบ้านฝาย', subdistrict: 'ต.ห้วยมุ่น', district: 'น้ำปาด', typeCategory: 'ฝาย', lat: 17.7420, lng: 100.7150, details: [] },
+            { uid: 's-4', category: 'SIRINDHORN', order: 4, name: 'สระเก็บน้ำบ้านธรรมวงศ์พร้อมฝายและระบบท่อ', subdistrict: 'ต.ห้วยมุ่น', district: 'น้ำปาด', typeCategory: 'โครงการอื่นๆ', lat: 17.8120, lng: 100.8210, details: [] },
+            { uid: 's-5', category: 'SIRINDHORN', order: 5, name: 'อ่างเก็บน้ำห้วยปูเจ้า', subdistrict: 'ต.ฝายหลวง', district: 'ลับแล', typeCategory: 'อ่างเก็บน้ำ', lat: 17.6680, lng: 100.0320, details: [] },
+            { uid: 's-6', category: 'SIRINDHORN', order: 6, name: 'ฝายตาดชั้น', subdistrict: 'ต.บ้านด่านนาขาม', district: 'เมืองอุตรดิตถ์', typeCategory: 'ฝาย', lat: 17.7150, lng: 100.1420, details: [] },
+            { uid: 's-7', category: 'SIRINDHORN', order: 7, name: 'ฝายดอนช้าง', subdistrict: 'ต.บ้านด่านนาขาม', district: 'เมืองอุตรดิตถ์', typeCategory: 'ฝาย', lat: 17.7240, lng: 100.1550, details: [] },
+            { uid: 's-8', category: 'SIRINDHORN', order: 8, name: 'ฝายป่าช้า', subdistrict: 'ต.บ้านด่านนาขาม', district: 'เมืองอุตรดิตถ์', typeCategory: 'ฝาย', lat: 17.7080, lng: 100.1350, details: [] },
+            { uid: 's-9', category: 'SIRINDHORN', order: 9, name: 'อ่างเก็บน้ำห้วยแม่เฉย', subdistrict: 'ต.บ้านด่านนาขาม', district: 'เมืองอุตรดิตถ์', typeCategory: 'อ่างเก็บน้ำ', lat: 17.7380, lng: 100.1680, details: [] },
+            { uid: 's-10', category: 'SIRINDHORN', order: 10, name: 'ขุดลอกห้วยแม่เฉยพร้อมซ่อมแซมฝาย 1 แห่ง', subdistrict: 'ต.บ้านด่านนาขาม', district: 'เมืองอุตรดิตถ์', typeCategory: 'โครงการอื่นๆ', lat: 17.7310, lng: 100.1610, details: [] },
+            { uid: 's-11', category: 'SIRINDHORN', order: 11, name: 'ฝายบ้านอ่างวัง', subdistrict: 'ต.ขุนฝาง', district: 'เมืองอุตรดิตถ์', typeCategory: 'ฝาย', lat: 17.6850, lng: 100.2240, details: [] },
+            { uid: 's-12', category: 'SIRINDHORN', order: 12, name: 'ขุดลอกห้วยแม่ผากพร้อมซ่อมแซมฝาย 2 แห่ง', subdistrict: 'ต.ขุนฝาง', district: 'เมืองอุตรดิตถ์', typeCategory: 'โครงการอื่นๆ', lat: 17.6940, lng: 100.2380, details: [] },
+            { uid: 's-13', category: 'SIRINDHORN', order: 13, name: 'ฝายห้วยต้นแดง', subdistrict: 'ต.ขุนฝาง', district: 'เมืองอุตรดิตถ์', typeCategory: 'ฝาย', lat: 17.6760, lng: 100.2490, details: [] },
+            { uid: 's-14', category: 'SIRINDHORN', order: 14, name: 'ฝายห้วยหญ้าคาพร้อมระบบส่งน้ำ', subdistrict: 'ต.ขุนฝาง', district: 'เมืองอุตรดิตถ์', typeCategory: 'ฝาย', lat: 17.7020, lng: 100.2560, details: [] },
+            { uid: 's-15', category: 'SIRINDHORN', order: 15, name: 'ฝายบ้านผาจังแล้วพร้อมระบบส่งน้ำ', subdistrict: 'ต.ขุนฝาง', district: 'เมืองอุตรดิตถ์', typeCategory: 'ฝาย', lat: 17.7120, lng: 100.2680, details: [] },
+            { uid: 's-16', category: 'SIRINDHORN', order: 16, name: 'ขุดลอกห้วยขุนฝาง', subdistrict: 'ต.ขุนฝาง', district: 'เมืองอุตรดิตถ์', typeCategory: 'โครงการอื่นๆ', lat: 17.6890, lng: 100.2310, details: [] },
+            { uid: 's-17', category: 'SIRINDHORN', order: 17, name: 'ฝายห้วยผางใหญ่', subdistrict: 'ต.ขุนฝาง', district: 'เมืองอุตรดิตถ์', typeCategory: 'ฝาย', lat: 17.7190, lng: 100.2750, details: [] },
+            { uid: 's-18', category: 'SIRINDHORN', order: 18, name: 'ฝายห้วยป่ารังใหญ่ 1', subdistrict: 'ต.น้ำหมัน', district: 'ท่าปลา', typeCategory: 'ฝาย', lat: 17.8450, lng: 100.3820, details: [] },
+            { uid: 's-19', category: 'SIRINDHORN', order: 19, name: 'ฝายห้วยน้ำซึม 1 พร้อมระบบส่งน้ำ', subdistrict: 'ต.น้ำหมัน', district: 'ท่าปลา', typeCategory: 'ฝาย', lat: 17.8560, lng: 100.3940, details: [] },
+            { uid: 's-20', category: 'SIRINDHORN', order: 20, name: 'ฝายห้วยปู่ต๊ะ 2 พร้อมระบบส่งน้ำ', subdistrict: 'ต.น้ำหมัน', district: 'ท่าปลา', typeCategory: 'ฝาย', lat: 17.8640, lng: 100.4060, details: [] },
+            { uid: 's-21', category: 'SIRINDHORN', order: 21, name: 'ฝายห้วยน้ำซึม 3 พร้อมระบบส่งน้ำ', subdistrict: 'ต.น้ำหมัน', district: 'ท่าปลา', typeCategory: 'ฝาย', lat: 17.8710, lng: 100.4150, details: [] },
+            { uid: 's-22', category: 'SIRINDHORN', order: 22, name: 'ทำนบดินห้วยตองพร้อมระบบส่งน้ำ', subdistrict: 'ต.บ่อเบี้ย', district: 'บ้านโคก', typeCategory: 'โครงการอื่นๆ', lat: 18.0850, lng: 101.0780, details: [] },
+            { uid: 's-23', category: 'SIRINDHORN', order: 23, name: 'ทำนบดินห้วยน้ำไฟพร้อมระบบส่งน้ำ', subdistrict: 'ต.บ่อเบี้ย', district: 'บ้านโคก', typeCategory: 'โครงการอื่นๆ', lat: 18.0980, lng: 101.0920, details: [] },
+            { uid: 's-24', category: 'SIRINDHORN', order: 24, name: 'โครงการระบบประปาฯ หมู่ที่ 6 บ้านธรรมวงศ์ หมู่ที่ 7 บ้านล่องลี หมู่ที่ 8 บ้านหนองแก้ว', subdistrict: 'ต.ห้วยมุ่น', district: 'น้ำปาด', typeCategory: 'โครงการอื่นๆ', lat: 17.8250, lng: 100.8380, details: [] },
+
+            { uid: 'p-1', category: 'PLANNED', order: 1, name: 'อ่างเก็บน้ำห้วยผาคำพร้อมอาคารประกอบ (11 ตุลาคม 2562)', subdistrict: 'ต.สองห้อง', district: 'ฟากท่า', typeCategory: 'อยู่ในแผนดำเนินการ', lat: 17.9820, lng: 100.8650, details: ['อ่างเก็บน้ำความจุ 3.97 ล้านลูกบาศก์เมตร พร้อมระบบส่งน้ำ', 'งบประมาณ 100 ล้านบาท', 'อยู่ในแผนดำเนินการ ปี 2570'] },
+            { uid: 'p-2', category: 'PLANNED', order: 2, name: 'โครงการระบบประปาฯ หมู่ที่ 6 บ้านธรรมวงศ์ หมู่ที่ 7 บ้านล่องลี หมู่ที่ 8 บ้านหนองแก้ว (22 พฤษภาคม 2563)', subdistrict: 'ต.ห้วยมุ่น', district: 'น้ำปาด', typeCategory: 'อยู่ในแผนดำเนินการ', lat: 17.8340, lng: 100.8510, details: ['ระบบท่อส่งน้ำพร้อมอาคารประกอบ และถังเก็บน้ำขนาด 200 ลูกบาศก์เมตร จำนวน 4 แห่ง', 'งบประมาณ 85 ล้านบาท', 'อยู่ในแผนดำเนินการ ปี 2572'] }
+        ];
+
+        // Application State
+        let projectsData = [];
+        let statsData = {};
+        let categoriesData = [];
+        let isAdminMode = false;
+        let currentCategory = 'ALL';
+        let currentDistrict = 'ALL';
+        let currentTypeFilter = 'ALL';
+        let currentSearch = '';
+
+        // Leaflet Map Variables
+        let map = null;
+        let streetLayer = null;
+        let satelliteLayer = null;
+        let markersLayerGroup = null;
+        let markerLookup = {};
+        let mapPickingMode = null;
+
+        // Build Category Metadata Map with Theme
+        function getCategoryMetaMap() {
+            const mapObj = {};
+            categoriesData.forEach(cat => {
+                const preset = COLOR_PRESETS[cat.colorKey] || COLOR_PRESETS.amber;
+                mapObj[cat.id] = {
+                    ...cat,
+                    theme: {
+                        dot: preset.dot,
+                        tab: preset.tab,
+                        pill: preset.pill,
+                        headerBg: preset.headerBg,
+                        border: preset.border,
+                        badgeBg: preset.badgeBg,
+                        numberBg: preset.numberBg,
+                        icon: preset.icon
+                    }
+                };
+            });
+            return mapObj;
+        }
+
+        // ==========================================
+        // EMBLEM IMAGE AUTO-SAVE & LOAD (localStorage)
+        // ==========================================
+        function handleEmblemError(imgEl) {
+            const saved = localStorage.getItem(STORAGE_KEY_EMBLEM);
+            if (saved && imgEl.src !== saved) {
+                imgEl.dataset.fallbackApplied = '';
+                imgEl.src = saved;
+                return;
+            }
+            if (!imgEl.dataset.fallbackApplied) {
+                imgEl.dataset.fallbackApplied = 'true';
+                imgEl.src = 'https://placehold.co/120x140/e0f2fe/0f294a?text=RID';
+            }
+        }
+
+        function loadSavedEmblem() {
+            const imgEl = document.getElementById('emblemImg');
+            if (!imgEl) return;
+            try {
+                const savedEmblem = localStorage.getItem(STORAGE_KEY_EMBLEM);
+                if (savedEmblem) {
+                    imgEl.dataset.fallbackApplied = '';
+                    imgEl.src = savedEmblem;
+                }
+            } catch (e) {
+                console.error('Error loading saved emblem:', e);
+            }
+        }
+
+        function handleEmblemUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                showToast('กรุณาเลือกไฟล์รูปภาพเท่านั้น', 'error');
+                event.target.value = '';
+                return;
+            }
+
+            if (file.size > 3 * 1024 * 1024) {
+                showToast('ไฟล์รูปใหญ่เกิน 3 MB กรุณาเลือกรูปที่มีขนาดเล็กลง', 'warning');
+                event.target.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64Data = e.target.result;
+                const imgEl = document.getElementById('emblemImg');
+                try {
+                    localStorage.setItem(STORAGE_KEY_EMBLEM, base64Data);
+                    if (imgEl) {
+                        imgEl.dataset.fallbackApplied = '';
+                        imgEl.src = base64Data;
+                    }
+                    showToast('อัปโหลดและบันทึกรูปตราสัญลักษณ์อัตโนมัติเรียบร้อยแล้ว', 'success');
+                } catch (err) {
+                    showToast('พื้นที่จัดเก็บเบราว์เซอร์เต็ม ไม่สามารถบันทึกรูปถาวรได้', 'error');
+                }
+            };
+            reader.readAsDataURL(file);
+            event.target.value = '';
+        }
+
+        function resetEmblemImage() {
+            localStorage.removeItem(STORAGE_KEY_EMBLEM);
+            const imgEl = document.getElementById('emblemImg');
+            if (imgEl) {
+                imgEl.dataset.fallbackApplied = '';
+                imgEl.src = DEFAULT_EMBLEM_SRC;
+            }
+            showToast('คืนค่ารูปตราสัญลักษณ์เริ่มต้นแล้ว', 'info');
+        }
+
+        // ==========================================
+        // DATA STORAGE & UI RENDERING
+        // ==========================================
+        function loadAppData() {
+            try {
+                const savedProjects = localStorage.getItem(STORAGE_KEY_PROJECTS);
+                const savedStats = localStorage.getItem(STORAGE_KEY_STATS);
+                const savedCategories = localStorage.getItem(STORAGE_KEY_CATEGORIES);
+
+                projectsData = savedProjects ? JSON.parse(savedProjects) : JSON.parse(JSON.stringify(DEFAULT_PROJECTS));
+                statsData = savedStats ? JSON.parse(savedStats) : JSON.parse(JSON.stringify(DEFAULT_STATS));
+                categoriesData = savedCategories ? JSON.parse(savedCategories) : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+            } catch (e) {
+                console.error('Error loading localStorage:', e);
+                projectsData = JSON.parse(JSON.stringify(DEFAULT_PROJECTS));
+                statsData = JSON.parse(JSON.stringify(DEFAULT_STATS));
+                categoriesData = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+            }
+        }
+
+        function saveAppData() {
+            try {
+                localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(projectsData));
+                localStorage.setItem(STORAGE_KEY_STATS, JSON.stringify(statsData));
+                localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(categoriesData));
+            } catch (e) {
+                showToast('ไม่สามารถบันทึกข้อมูลลงในเบราว์เซอร์ได้', 'error');
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const bgColors = {
+                success: 'bg-emerald-700 text-white border-emerald-500',
+                info: 'bg-[#0f294a] text-white border-blue-400',
+                warning: 'bg-amber-500 text-slate-950 border-amber-600',
+                error: 'bg-rose-600 text-white border-rose-400'
+            };
+            const icons = {
+                success: 'fa-circle-check',
+                info: 'fa-circle-info',
+                warning: 'fa-triangle-exclamation',
+                error: 'fa-circle-xmark'
+            };
+            toast.className = `${bgColors[type] || bgColors.info} px-4 py-3 rounded-xl shadow-lg border text-xs sm:text-sm font-heading font-medium flex items-center gap-2.5 pointer-events-auto transition-all duration-300 transform translate-y-2 opacity-0`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i> <span>${message}</span>`;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        // Render Category Filter Tabs
+        function renderCategoryTabs() {
+            const tabsContainer = document.getElementById('categoryTabs');
+            const allActive = currentCategory === 'ALL';
+
+            let html = `
+                <button type="button" onclick="selectCategoryTab('ALL')" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-medium font-heading transition-all flex items-center gap-2 ${
+                    allActive
+                        ? 'bg-[#0f294a] text-white shadow-sm ring-2 ring-offset-1 ring-[#0f294a]'
+                        : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+                }">
+                    <span>ทั้งหมด</span>
+                    <span class="px-2 py-0.5 text-xs rounded-full ${allActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'}">${projectsData.length}</span>
+                </button>
+            `;
+
+            categoriesData.forEach(cat => {
+                const preset = COLOR_PRESETS[cat.colorKey] || COLOR_PRESETS.amber;
+                const count = projectsData.filter(p => p.category === cat.id).length;
+                const isSelected = currentCategory === cat.id;
+
+                html += `
+                    <button type="button" onclick="selectCategoryTab('${cat.id}')" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-medium font-heading transition-all border flex items-center gap-2 ${preset.tab} ${
+                        isSelected ? 'ring-2 ring-offset-1 ring-[#0f294a] shadow-sm font-semibold' : ''
+                    }">
+                        <span class="w-2.5 h-2.5 rounded-full ${preset.dot} shrink-0"></span>
+                        <span>${cat.shortTitle}</span>
+                        <span class="px-2 py-0.5 text-xs rounded-full ${preset.pill}">${count}</span>
+                    </button>
+                `;
+            });
+
+            tabsContainer.innerHTML = html;
+            populateCategorySelectInProjectModal();
+        }
+
+        function selectCategoryTab(catId) {
+            currentCategory = catId;
+            renderCategoryTabs();
+            renderAll();
+        }
+
+        function populateCategorySelectInProjectModal() {
+            const select = document.getElementById('formCategory');
+            if (!select) return;
+            const currentVal = select.value;
+            select.innerHTML = categoriesData.map(cat =>
+                `<option value="${cat.id}">${cat.title} (${cat.shortTitle})</option>`
+            ).join('');
+            if (currentVal && categoriesData.some(c => c.id === currentVal)) {
+                select.value = currentVal;
+            }
+        }
+
+        // Category Manager Modal Logic (Add / Edit / Delete)
+        function openCategoryManagerModal(mode = 'MANAGE') {
+            resetCategoryForm();
+            renderCategoryManageList();
+            openModal('categoryManagerModal');
+            if (mode === 'NEW') {
+                setTimeout(() => document.getElementById('catShortTitle').focus(), 100);
+            }
+        }
+
+        function resetCategoryForm() {
+            document.getElementById('catEditingId').value = '';
+            document.getElementById('catShortTitle').value = '';
+            document.getElementById('catFullTitle').value = '';
+            document.getElementById('catColorKey').value = 'amber';
+            document.getElementById('catIsPlanned').checked = false;
+            document.getElementById('catFormTitle').innerHTML = '<i class="fa-solid fa-plus-circle text-indigo-600 mr-1"></i> เพิ่มหมวดหมู่ใหม่';
+            document.getElementById('catSubmitBtn').innerHTML = '<i class="fa-solid fa-check"></i> <span>เพิ่มหมวดหมู่</span>';
+            document.getElementById('catFormCancelEditBtn').classList.add('hidden');
+        }
+
+        function editCategoryInForm(catId) {
+            const cat = categoriesData.find(c => c.id === catId);
+            if (!cat) return;
+            document.getElementById('catEditingId').value = cat.id;
+            document.getElementById('catShortTitle').value = cat.shortTitle;
+            document.getElementById('catFullTitle').value = cat.title === cat.shortTitle ? '' : cat.title;
+            document.getElementById('catColorKey').value = cat.colorKey || 'amber';
+            document.getElementById('catIsPlanned').checked = Boolean(cat.isPlanned);
+            document.getElementById('catFormTitle').innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-600 mr-1"></i> แก้ไขหมวดหมู่: <span class="text-indigo-700">${cat.shortTitle}</span>`;
+            document.getElementById('catSubmitBtn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> <span>บันทึกการแก้ไข</span>';
+            document.getElementById('catFormCancelEditBtn').classList.remove('hidden');
+            document.getElementById('catShortTitle').focus();
+        }
+
+        function saveCategoryForm(e) {
+            e.preventDefault();
+            const editingId = document.getElementById('catEditingId').value;
+            const shortTitle = document.getElementById('catShortTitle').value.trim();
+            const fullTitleRaw = document.getElementById('catFullTitle').value.trim();
+            const title = fullTitleRaw || `โครงการพระราชดำริ ${shortTitle}`;
+            const colorKey = document.getElementById('catColorKey').value;
+            const isPlanned = document.getElementById('catIsPlanned').checked;
+
+            if (!shortTitle) return;
+
+            if (editingId) {
+                const idx = categoriesData.findIndex(c => c.id === editingId);
+                if (idx !== -1) {
+                    categoriesData[idx] = {
+                        ...categoriesData[idx],
+                        shortTitle,
+                        title,
+                        colorKey,
+                        isPlanned
+                    };
+                    showToast(`แก้ไขหมวดหมู่ "${shortTitle}" เรียบร้อยแล้ว`, 'success');
+                }
+            } else {
+                const newId = 'CAT_' + Date.now();
+                categoriesData.push({
+                    id: newId,
+                    shortTitle,
+                    title,
+                    colorKey,
+                    isPlanned,
+                    isDefault: false
+                });
+                showToast(`เพิ่มหมวดหมู่ "${shortTitle}" เรียบร้อยแล้ว`, 'success');
+            }
+
+            saveAppData();
+            resetCategoryForm();
+            renderCategoryManageList();
+            renderCategoryTabs();
+            renderAll();
+        }
+
+        function deleteCategoryItem(catId) {
+            const cat = categoriesData.find(c => c.id === catId);
+            if (!cat) return;
+
+            const fallbackCat = categoriesData.find(c => c.id !== catId) || DEFAULT_CATEGORIES[0];
+            const affectedCount = projectsData.filter(p => p.category === catId).length;
+
+            document.getElementById('confirmTitle').textContent = 'ยืนยันการลบหมวดหมู่';
+            document.getElementById('confirmMessage').textContent = affectedCount > 0
+                ? `หมวดหมู่ "${cat.shortTitle}" มีโครงการอยู่ ${affectedCount} โครงการ ระบบจะย้ายไปไว้ที่ "${fallbackCat.shortTitle}" อัตโนมัติ ยืนยันหรือไม่?`
+                : `คุณต้องการลบหมวดหมู่ "${cat.shortTitle}" ใช่หรือไม่?`;
+
+            document.getElementById('confirmActionBtn').onclick = () => {
+                projectsData.forEach(p => {
+                    if (p.category === catId) p.category = fallbackCat.id;
+                });
+                if (currentCategory === catId) currentCategory = 'ALL';
+                categoriesData = categoriesData.filter(c => c.id !== catId);
+
+                saveAppData();
+                resetCategoryForm();
+                renderCategoryManageList();
+                renderCategoryTabs();
+                renderAll();
+                closeModal('confirmModal');
+                showToast(`ลบหมวดหมู่ "${cat.shortTitle}" เรียบร้อยแล้ว`, 'warning');
+            };
+            openModal('confirmModal');
+        }
+
+        function renderCategoryManageList() {
+            const listEl = document.getElementById('categoryManageList');
+            listEl.innerHTML = categoriesData.map(cat => {
+                const preset = COLOR_PRESETS[cat.colorKey] || COLOR_PRESETS.amber;
+                const count = projectsData.filter(p => p.category === cat.id).length;
+                return `
+                    <div class="flex items-center justify-between gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <span class="w-3.5 h-3.5 rounded-full ${preset.dot} shrink-0"></span>
+                            <div class="min-w-0">
+                                <p class="font-heading font-semibold text-sm text-slate-800 truncate">${cat.shortTitle}</p>
+                                <p class="text-[11px] text-slate-500 truncate">${cat.title} • <strong>${count}</strong> โครงการ</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button type="button" onclick="editCategoryInForm('${cat.id}')" class="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg text-xs font-heading font-semibold transition">
+                                <i class="fa-solid fa-pen"></i> แก้ไข
+                            </button>
+                            ${categoriesData.length > 1 ? `
+                                <button type="button" onclick="deleteCategoryItem('${cat.id}')" class="px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded-lg text-xs font-heading font-semibold transition" title="ลบหมวดหมู่">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render Dashboard Statistics
+        function renderStats() {
+            document.getElementById('headerTotalCount').textContent = statsData.totalProjects;
+            document.getElementById('headerCompletedCount').textContent = statsData.completedProjects;
+            document.getElementById('headerPlannedCount').textContent = statsData.plannedProjects;
+
+            document.getElementById('statTotalProjects').textContent = statsData.totalProjects;
+            document.getElementById('statCompletedText').textContent = statsData.completedProjects;
+            document.getElementById('statPlannedText').textContent = statsData.plannedProjects;
+            document.getElementById('statCapacity').textContent = Number(statsData.capacity).toLocaleString();
+            document.getElementById('statArea').textContent = Number(statsData.area).toLocaleString();
+            document.getElementById('statHouseholds').textContent = Number(statsData.households).toLocaleString();
+
+            document.getElementById('statReservoirCount').textContent = `${statsData.reservoirCount} โครงการ`;
+            document.getElementById('statWeirCount').textContent = `${statsData.weirCount} โครงการ`;
+            document.getElementById('statOtherCount').textContent = `${statsData.otherCount} โครงการ`;
+
+            const totalStruct = (Number(statsData.reservoirCount) + Number(statsData.weirCount) + Number(statsData.otherCount)) || 1;
+            document.getElementById('barReservoir').style.width = `${(statsData.reservoirCount / totalStruct) * 100}%`;
+            document.getElementById('barWeir').style.width = `${(statsData.weirCount / totalStruct) * 100}%`;
+            document.getElementById('barOther').style.width = `${(statsData.otherCount / totalStruct) * 100}%`;
+
+            renderCategoryTabs();
+        }
+
+        // Initialize Leaflet Interactive Map
+        function initMap() {
+            map = L.map('projectMap', {
+                center: [17.78, 100.45],
+                zoom: 9,
+                zoomControl: true
+            });
+
+            streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 18,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 18,
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics'
+            });
+
+            markersLayerGroup = L.layerGroup().addTo(map);
+
+            map.on('click', function(e) {
+                if (mapPickingMode === 'MODAL_PICK') {
+                    const lat = e.latlng.lat.toFixed(6);
+                    const lng = e.latlng.lng.toFixed(6);
+                    document.getElementById('formLat').value = lat;
+                    document.getElementById('formLng').value = lng;
+                    cancelMapPicking();
+                    openModal('projectModal');
+                    showToast(`เลือกพิกัดเรียบร้อย (${lat}, ${lng})`, 'success');
+                } else if (mapPickingMode === 'QUICK_ADD') {
+                    const lat = e.latlng.lat.toFixed(6);
+                    const lng = e.latlng.lng.toFixed(6);
+                    cancelMapPicking();
+                    openProjectModal(null, { lat, lng });
+                }
+            });
+
+            map.on('contextmenu', function(e) {
+                if (!isAdminMode) return;
+                const lat = e.latlng.lat.toFixed(6);
+                const lng = e.latlng.lng.toFixed(6);
+                openProjectModal(null, { lat, lng });
+                showToast('ปักหมุดตำแหน่งใหม่ กรุณากรอกรายละเอียดโครงการ', 'info');
+            });
+        }
+
+        function switchBaseMap(type) {
+            const btnStreet = document.getElementById('btnStreetMap');
+            const btnSat = document.getElementById('btnSatMap');
+            if (type === 'satellite') {
+                map.removeLayer(streetLayer);
+                map.addLayer(satelliteLayer);
+                btnSat.classList.add('bg-white', 'text-[#0f294a]', 'shadow-xs');
+                btnSat.classList.remove('text-slate-600');
+                btnStreet.classList.remove('bg-white', 'text-[#0f294a]', 'shadow-xs');
+                btnStreet.classList.add('text-slate-600');
+            } else {
+                map.removeLayer(satelliteLayer);
+                map.addLayer(streetLayer);
+                btnStreet.classList.add('bg-white', 'text-[#0f294a]', 'shadow-xs');
+                btnStreet.classList.remove('text-slate-600');
+                btnSat.classList.remove('bg-white', 'text-[#0f294a]', 'shadow-xs');
+                btnSat.classList.add('text-slate-600');
+            }
+        }
+
+        function createCustomMarkerIcon(typeCategory) {
+            let bgColor = '#f97316';
+            let borderColor = '#ffffff';
+            let iconClass = 'fa-water';
+
+            if (typeCategory === 'อ่างเก็บน้ำ') {
+                bgColor = '#14b8a6';
+                iconClass = 'fa-droplet';
+            } else if (typeCategory === 'ฝาย') {
+                bgColor = '#ec4899';
+                iconClass = 'fa-bars-staggered';
+            } else if (typeCategory === 'อยู่ในแผนดำเนินการ') {
+                bgColor = '#fbbf24';
+                borderColor = '#1e293b';
+                iconClass = 'fa-clock';
+            }
+
+            return L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div style="background-color: ${bgColor}; border: 2.5px solid ${borderColor};" class="w-7 h-7 rounded-full shadow-md flex items-center justify-center text-white text-[11px] hover:scale-110 transition-transform">
+                        <i class="fa-solid ${iconClass}" style="color: ${typeCategory === 'อยู่ในแผนดำเนินการ' ? '#1e293b' : '#ffffff'}"></i>
+                       </div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+                popupAnchor: [0, -14]
+            });
+        }
+
+        function renderMapMarkers(filteredList) {
+            if (!markersLayerGroup) return;
+            markersLayerGroup.clearLayers();
+            markerLookup = {};
+            const catMetaMap = getCategoryMetaMap();
+
+            document.getElementById('mapVisibleCount').textContent = `${filteredList.length} จุด`;
+
+            filteredList.forEach(proj => {
+                if (typeof proj.lat !== 'number' || typeof proj.lng !== 'number' || isNaN(proj.lat) || isNaN(proj.lng)) return;
+
+                const catMeta = catMetaMap[proj.category] || Object.values(catMetaMap)[0];
+                const marker = L.marker([proj.lat, proj.lng], {
+                    icon: createCustomMarkerIcon(proj.typeCategory),
+                    draggable: isAdminMode
+                });
+
+                const locStr = proj.subdistrict && proj.subdistrict !== '-' ? `${proj.subdistrict} อ.${proj.district}` : `อ.${proj.district}`;
+                const detailsHtml = (proj.details && proj.details.length > 0)
+                    ? `<ul class="mt-2 pt-2 border-t border-slate-100 space-y-1 text-xs text-slate-600">${proj.details.map(d => `<li>• ${d}</li>`).join('')}</ul>`
+                    : '';
+
+                const adminControlsHtml = isAdminMode ? `
+                    <div class="mt-3 pt-2 border-t border-slate-200 flex items-center justify-between gap-2">
+                        <span class="text-[10px] text-amber-700 font-medium"><i class="fa-solid fa-arrows-up-down-left-right"></i> ลากหมุดเพื่อย้ายจุดได้</span>
+                        <div class="flex gap-1.5">
+                            <button onclick="openProjectModal('${proj.uid}')" class="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded text-xs font-heading font-semibold">แก้ไข</button>
+                            <button onclick="confirmDeleteProject('${proj.uid}')" class="px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded text-xs font-heading font-semibold">ลบ</button>
+                        </div>
+                    </div>
+                ` : '';
+
+                const popupContent = `
+                    <div class="min-w-[230px] max-w-[280px]">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <span class="text-[10px] font-heading font-bold px-2 py-0.5 rounded ${catMeta.theme.badgeBg}">${catMeta.shortTitle} (ลำดับ ${proj.order})</span>
+                            <span class="text-[10px] text-slate-500 font-medium">${proj.typeCategory}</span>
+                        </div>
+                        <h4 class="font-heading font-bold text-sm text-[#0f294a] leading-snug mt-1">${proj.name}</h4>
+                        <p class="text-xs text-teal-700 font-medium mt-1"><i class="fa-solid fa-location-dot text-rose-500 mr-1"></i>${locStr}</p>
+                        <p class="text-[10px] text-slate-400 font-mono mt-0.5">พิกัด: ${proj.lat.toFixed(4)}, ${proj.lng.toFixed(4)}</p>
+                        ${detailsHtml}
+                        ${adminControlsHtml}
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+
+                marker.on('dragend', function(event) {
+                    const newPos = event.target.getLatLng();
+                    const targetProj = projectsData.find(p => p.uid === proj.uid);
+                    if (targetProj) {
+                        targetProj.lat = Number(newPos.lat.toFixed(6));
+                        targetProj.lng = Number(newPos.lng.toFixed(6));
+                        saveAppData();
+                        renderAll();
+                        showToast(`อัปเดตพิกัด "${targetProj.name}" เรียบร้อยแล้ว`, 'success');
+                    }
+                });
+
+                marker.addTo(markersLayerGroup);
+                markerLookup[proj.uid] = marker;
+            });
+        }
+
+        function focusProjectOnMap(uid) {
+            const proj = projectsData.find(p => p.uid === uid);
+            const marker = markerLookup[uid];
+            if (proj && marker) {
+                document.getElementById('mapSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => {
+                    map.flyTo([proj.lat, proj.lng], 13, { duration: 1.2 });
+                    marker.openPopup();
+                }, 350);
+            } else {
+                showToast('ไม่พบพิกัดของโครงการนี้บนแผนที่', 'warning');
+            }
+        }
+
+        function fitMapToBounds() {
+            map.flyTo([17.78, 100.45], 9, { duration: 1 });
+        }
+
+        function highlightText(text, query) {
+            if (!query) return text;
+            const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${escapedQuery})`, 'gi');
+            return text.replace(regex, '<mark class="bg-amber-200 text-slate-900 px-0.5 rounded">$1</mark>');
+        }
+
+        function buildCategorySectionElement(cat, catMeta, catProjects, totalInCategory) {
+            const sectionEl = document.createElement('section');
+            sectionEl.className = `bg-white rounded-2xl shadow-sm border ${catMeta.theme.border} overflow-hidden transition-all`;
+
+            const countBadgeText = catProjects.length === totalInCategory
+                ? `จำนวน ${totalInCategory} โครงการ`
+                : `พบ ${catProjects.length} จาก ${totalInCategory} โครงการ`;
+
+            const headerHtml = `
+                <div class="${catMeta.theme.headerBg} px-5 py-4 sm:px-6 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-start sm:items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                            <i class="fa-solid ${catMeta.theme.icon} text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-heading font-semibold text-base sm:text-lg leading-snug">
+                                ${catMeta.title}
+                            </h3>
+                        </div>
+                    </div>
+                    <div class="self-start sm:self-center shrink-0">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-heading font-semibold bg-white/20 backdrop-blur-sm border border-white/30 text-white">
+                            ${countBadgeText}
+                        </span>
+                    </div>
+                </div>
+            `;
+
+            let bodyHtml = '';
+
+            if (catMeta.isPlanned) {
+                bodyHtml = `<div class="p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-2 gap-5 bg-emerald-50/30">`;
+                catProjects.forEach(proj => {
+                    const highlightedName = highlightText(proj.name, currentSearch.trim());
+                    const locText = proj.subdistrict && proj.subdistrict !== '-' ? `${proj.subdistrict} อ.${proj.district}` : `อ.${proj.district}`;
+                    const highlightedLoc = highlightText(locText, currentSearch.trim());
+
+                    const adminBtns = isAdminMode ? `
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="openProjectModal('${proj.uid}')" class="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg text-xs font-heading font-semibold transition" title="แก้ไขโครงการ">
+                                <i class="fa-solid fa-pen"></i> แก้ไข
+                            </button>
+                            <button onclick="confirmDeleteProject('${proj.uid}')" class="px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded-lg text-xs font-heading font-semibold transition" title="ลบโครงการ">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    ` : '';
+
+                    bodyHtml += `
+                        <div class="bg-white rounded-xl p-5 border border-emerald-200 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                            <div>
+                                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-heading font-bold ${catMeta.theme.numberBg}">
+                                        ลำดับที่ ${proj.order}
+                                    </span>
+                                    <div class="flex items-center gap-2">
+                                        <button onclick="focusProjectOnMap('${proj.uid}')" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-heading font-medium bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-200 transition">
+                                            <i class="fa-solid fa-location-dot text-rose-500"></i> ดูบนแผนที่
+                                        </button>
+                                        ${adminBtns}
+                                    </div>
+                                </div>
+                                <h4 class="font-heading font-semibold text-base text-[#0f294a] leading-relaxed mb-2">
+                                    ${highlightedName}
+                                </h4>
+                                <p class="text-sm text-teal-700 font-medium mb-4 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-map-pin text-rose-500"></i> ${highlightedLoc}
+                                </p>
+                                
+                                ${(proj.details && proj.details.length > 0) ? `
+                                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-200/80 space-y-2">
+                                        <p class="text-xs font-heading font-semibold text-slate-500 uppercase tracking-wider">ลักษณะโครงการและงบประมาณ:</p>
+                                        <ul class="space-y-1.5 text-sm text-slate-700">
+                                            ${proj.details.map(detail => `
+                                                <li class="flex items-start gap-2">
+                                                    <i class="fa-solid fa-circle-check text-emerald-600 mt-1 text-xs shrink-0"></i>
+                                                    <span>${highlightText(detail, currentSearch.trim())}</span>
+                                                </li>
+                                            `).join('')}
+                                        </ul>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                bodyHtml += `</div>`;
+            } else {
+                bodyHtml = `<div class="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-3.5">`;
+                catProjects.forEach(proj => {
+                    const highlightedName = highlightText(proj.name, currentSearch.trim());
+                    const locText = proj.subdistrict && proj.subdistrict !== '-' ? `${proj.subdistrict} อ.${proj.district}` : `อ.${proj.district}`;
+                    const highlightedLoc = highlightText(locText, currentSearch.trim());
+
+                    const adminBtns = isAdminMode ? `
+                        <div class="flex items-center gap-1 ml-auto">
+                            <button onclick="openProjectModal('${proj.uid}')" class="p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg text-xs transition" title="แก้ไขโครงการ">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button onclick="confirmDeleteProject('${proj.uid}')" class="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded-lg text-xs transition" title="ลบโครงการ">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    ` : '';
+
+                    bodyHtml += `
+                        <div class="group rounded-xl p-3.5 sm:p-4 bg-slate-50/70 hover:bg-white border border-slate-200/80 hover:border-teal-400 transition-all flex items-start gap-3.5 shadow-2xs hover:shadow-sm">
+                            <div class="w-8 h-8 rounded-lg ${catMeta.theme.numberBg} font-heading font-bold text-sm flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                                ${proj.order}
+                            </div>
+                            
+                            <div class="flex-grow min-w-0">
+                                <h4 class="font-medium text-slate-800 group-hover:text-[#0f294a] text-sm sm:text-base leading-snug">
+                                    ${highlightedName}
+                                </h4>
+                                ${(proj.details && proj.details.length > 0) ? `<p class="text-xs text-slate-500 mt-1">${highlightText(proj.details.join(' | '), currentSearch.trim())}</p>` : ''}
+                                <div class="flex flex-wrap items-center gap-2 mt-2.5">
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-slate-600 bg-white px-2.5 py-0.5 rounded-md border border-slate-200">
+                                        <i class="fa-solid fa-location-dot text-teal-600"></i> ${highlightedLoc}
+                                    </span>
+                                    <span class="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-md ${catMeta.theme.badgeBg}">
+                                        ${proj.typeCategory}
+                                    </span>
+                                    <button onclick="focusProjectOnMap('${proj.uid}')" class="inline-flex items-center gap-1 text-[11px] font-heading font-medium text-cyan-800 bg-cyan-50 hover:bg-cyan-100 px-2 py-0.5 rounded-md border border-cyan-200 transition">
+                                        <i class="fa-solid fa-map-location-dot text-cyan-600"></i> ดูบนแผนที่
+                                    </button>
+                                    ${adminBtns}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                bodyHtml += `</div>`;
+            }
+
+            sectionEl.innerHTML = headerHtml + bodyHtml;
+            return sectionEl;
+        }
+
+        function renderAll() {
+            const plannedProjectsContainer = document.getElementById('plannedProjectsContainer');
+            const projectsContainer = document.getElementById('projectsContainer');
+            const emptyState = document.getElementById('emptyState');
+            const resultSummary = document.getElementById('resultSummary');
+            const resetAllBtn = document.getElementById('resetAllBtn');
+            const catMetaMap = getCategoryMetaMap();
+
+            plannedProjectsContainer.innerHTML = '';
+            projectsContainer.innerHTML = '';
+            const query = currentSearch.trim().toLowerCase();
+
+            const allFilteredProjects = projectsData.filter(proj => {
+                const matchCat = (currentCategory === 'ALL') || (proj.category === currentCategory);
+                const matchDistrict = (currentDistrict === 'ALL') || (proj.district === currentDistrict);
+                const matchType = (currentTypeFilter === 'ALL') || (proj.typeCategory === currentTypeFilter);
+
+                const searchable = `${proj.name} ${proj.subdistrict} ${proj.district} ${proj.typeCategory} ${(proj.details || []).join(' ')}`.toLowerCase();
+                const matchSearch = !query || searchable.includes(query);
+
+                return matchCat && matchDistrict && matchType && matchSearch;
+            });
+
+            renderMapMarkers(allFilteredProjects);
+
+            let visiblePlannedCount = 0;
+            let visibleRegularCount = 0;
+
+            categoriesData.forEach(cat => {
+                if (currentCategory !== 'ALL' && currentCategory !== cat.id) return;
+
+                const catMeta = catMetaMap[cat.id];
+                const catProjects = allFilteredProjects
+                    .filter(p => p.category === cat.id)
+                    .sort((a, b) => a.order - b.order);
+
+                const totalInCategory = projectsData.filter(p => p.category === cat.id).length;
+
+                if (catProjects.length === 0) return;
+
+                const sectionEl = buildCategorySectionElement(cat, catMeta, catProjects, totalInCategory);
+
+                // แยกส่วน "อยู่ในแผนดำเนินการ" ไปแสดงไว้ข้างล่างกล่องค้นหาและเหนือแผนที่
+                if (catMeta.isPlanned) {
+                    visiblePlannedCount++;
+                    plannedProjectsContainer.appendChild(sectionEl);
+                } else {
+                    visibleRegularCount++;
+                    projectsContainer.appendChild(sectionEl);
+                }
+            });
+
+            plannedProjectsContainer.classList.toggle('hidden', visiblePlannedCount === 0);
+            projectsContainer.classList.toggle('hidden', visibleRegularCount === 0);
+
+            if (visiblePlannedCount === 0 && visibleRegularCount === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            const isFiltered = currentCategory !== 'ALL' || currentDistrict !== 'ALL' || currentTypeFilter !== 'ALL' || query !== '';
+            if (isFiltered) {
+                resultSummary.innerHTML = `พบข้อมูลที่ตรงกับเงื่อนไข <span class="font-bold text-teal-700">${allFilteredProjects.length}</span> รายการ`;
+                resetAllBtn.classList.remove('hidden');
+            } else {
+                resultSummary.innerHTML = `กำลังแสดงข้อมูลทั้งหมด <span class="font-bold text-[#0f294a]">${projectsData.length}</span> รายการ (แบ่งตามหมวดหมู่พระนามและแผนดำเนินการ)`;
+                resetAllBtn.classList.add('hidden');
+            }
+        }
+
+        // ==========================================
+        // ADMIN MODE & CRUD FUNCTIONS
+        // ==========================================
+
+        function handleAdminToggle() {
+            if (isAdminMode) {
+                isAdminMode = false;
+                updateAdminUI();
+                showToast('ออกจากโหมดผู้ดูแลระบบแล้ว', 'info');
+            } else {
+                document.getElementById('adminPasswordInput').value = '';
+                document.getElementById('loginErrorMsg').classList.add('hidden');
+                openModal('adminLoginModal');
+                setTimeout(() => document.getElementById('adminPasswordInput').focus(), 100);
+            }
+        }
+
+        function submitAdminLogin(e) {
+            e.preventDefault();
+            const pwd = document.getElementById('adminPasswordInput').value.trim();
+            if (pwd === '1234' || pwd === 'admin') {
+                isAdminMode = true;
+                closeModal('adminLoginModal');
+                updateAdminUI();
+                showToast('เข้าสู่โหมดผู้ดูแลระบบสำเร็จ สามารถเพิ่ม/แก้ไขหมวดหมู่ โครงการ และลากหมุดบนแผนที่ได้', 'success');
+            } else {
+                document.getElementById('loginErrorMsg').classList.remove('hidden');
+            }
+        }
+
+        function quickAdminLogin() {
+            isAdminMode = true;
+            closeModal('adminLoginModal');
+            updateAdminUI();
+            showToast('เข้าสู่โหมดผู้ดูแลระบบ (โหมดทดสอบ) สำเร็จ', 'success');
+        }
+
+        function updateAdminUI() {
+            const adminBanner = document.getElementById('adminBanner');
+            const adminToggleBtn = document.getElementById('adminToggleBtn');
+            const adminLockIcon = document.getElementById('adminLockIcon');
+            const adminBtnText = document.getElementById('adminBtnText');
+            const adminOnlyEls = document.querySelectorAll('.admin-only-el');
+
+            if (isAdminMode) {
+                adminBanner.classList.remove('hidden');
+                adminToggleBtn.classList.add('bg-amber-500', 'text-slate-950', 'border-amber-400');
+                adminToggleBtn.classList.remove('bg-white/15', 'text-white');
+                adminLockIcon.className = 'fa-solid fa-lock-open text-slate-900';
+                adminBtnText.textContent = 'ออกจากโหมดแอดมิน';
+                adminOnlyEls.forEach(el => el.classList.remove('hidden'));
+            } else {
+                adminBanner.classList.add('hidden');
+                adminToggleBtn.classList.remove('bg-amber-500', 'text-slate-950', 'border-amber-400');
+                adminToggleBtn.classList.add('bg-white/15', 'text-white');
+                adminLockIcon.className = 'fa-solid fa-lock text-amber-300';
+                adminBtnText.textContent = 'เข้าสู่โหมดแอดมิน';
+                adminOnlyEls.forEach(el => el.classList.add('hidden'));
+                cancelMapPicking();
+            }
+
+            renderAll();
+        }
+
+        function openProjectModal(uid = null, presetCoords = null) {
+            populateCategorySelectInProjectModal();
+            const modalTitle = document.getElementById('projectModalTitle');
+            const uidInput = document.getElementById('editProjectUid');
+            const catSelect = document.getElementById('formCategory');
+            const orderInput = document.getElementById('formOrder');
+            const nameInput = document.getElementById('formName');
+            const subInput = document.getElementById('formSubdistrict');
+            const distSelect = document.getElementById('formDistrict');
+            const typeSelect = document.getElementById('formTypeCategory');
+            const latInput = document.getElementById('formLat');
+            const lngInput = document.getElementById('formLng');
+            const detailsInput = document.getElementById('formDetails');
+
+            if (uid) {
+                const proj = projectsData.find(p => p.uid === uid);
+                if (!proj) return;
+                modalTitle.textContent = 'แก้ไขข้อมูลโครงการ';
+                uidInput.value = proj.uid;
+                catSelect.value = proj.category;
+                orderInput.value = proj.order;
+                nameInput.value = proj.name;
+                subInput.value = proj.subdistrict === '-' ? '' : proj.subdistrict;
+                distSelect.value = proj.district;
+                typeSelect.value = proj.typeCategory;
+                latInput.value = proj.lat;
+                lngInput.value = proj.lng;
+                detailsInput.value = (proj.details || []).join('\n');
+            } else {
+                modalTitle.textContent = 'เพิ่มโครงการใหม่';
+                uidInput.value = '';
+                const defaultCat = currentCategory !== 'ALL' ? currentCategory : (categoriesData[0]?.id || 'SIRINDHORN');
+                catSelect.value = defaultCat;
+                const maxOrder = projectsData
+                    .filter(p => p.category === defaultCat)
+                    .reduce((max, p) => Math.max(max, Number(p.order) || 0), 0);
+                orderInput.value = maxOrder + 1;
+                nameInput.value = '';
+                subInput.value = '';
+                distSelect.value = currentDistrict !== 'ALL' ? currentDistrict : 'เมืองอุตรดิตถ์';
+                typeSelect.value = defaultCat === 'PLANNED' ? 'อยู่ในแผนดำเนินการ' : 'ฝาย';
+                latInput.value = presetCoords ? presetCoords.lat : '17.625000';
+                lngInput.value = presetCoords ? presetCoords.lng : '100.095000';
+                detailsInput.value = '';
+            }
+
+            openModal('projectModal');
+        }
+
+        function saveProjectForm(e) {
+            e.preventDefault();
+            const uid = document.getElementById('editProjectUid').value;
+            const category = document.getElementById('formCategory').value;
+            const order = Number(document.getElementById('formOrder').value) || 1;
+            const name = document.getElementById('formName').value.trim();
+            const subRaw = document.getElementById('formSubdistrict').value.trim();
+            const subdistrict = subRaw ? (subRaw.startsWith('ต.') ? subRaw : `ต.${subRaw}`) : '-';
+            const district = document.getElementById('formDistrict').value;
+            const typeCategory = document.getElementById('formTypeCategory').value;
+            const lat = parseFloat(document.getElementById('formLat').value);
+            const lng = parseFloat(document.getElementById('formLng').value);
+            const detailsRaw = document.getElementById('formDetails').value.trim();
+            const details = detailsRaw ? detailsRaw.split('\n').map(line => line.trim()).filter(Boolean) : [];
+
+            if (uid) {
+                const idx = projectsData.findIndex(p => p.uid === uid);
+                if (idx !== -1) {
+                    projectsData[idx] = { ...projectsData[idx], category, order, name, subdistrict, district, typeCategory, lat, lng, details };
+                    showToast('บันทึกการแก้ไขโครงการเรียบร้อยแล้ว', 'success');
+                }
+            } else {
+                const newUid = 'custom-' + Date.now();
+                projectsData.push({ uid: newUid, category, order, name, subdistrict, district, typeCategory, lat, lng, details });
+                showToast('เพิ่มโครงการใหม่และปักหมุดบนแผนที่เรียบร้อยแล้ว', 'success');
+            }
+
+            saveAppData();
+            renderStats();
+            renderAll();
+            closeModal('projectModal');
+        }
+
+        function pickLocationFromModal() {
+            closeModal('projectModal');
+            mapPickingMode = 'MODAL_PICK';
+            document.getElementById('mapPickingBanner').classList.remove('hidden');
+            document.getElementById('mapPickingText').innerHTML = '<strong>โหมดเลือกพิกัด:</strong> คลิกจิ้มจุดที่ตั้งโครงการบนแผนที่ แล้วระบบจะนำพิกัดกลับเข้าสู่แบบฟอร์มอัตโนมัติ';
+            document.getElementById('projectMap').classList.add('map-picking-cursor');
+            document.getElementById('mapSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function toggleQuickPinMode() {
+            if (mapPickingMode === 'QUICK_ADD') {
+                cancelMapPicking();
+                return;
+            }
+            mapPickingMode = 'QUICK_ADD';
+            document.getElementById('mapPickingBanner').classList.remove('hidden');
+            document.getElementById('mapPickingText').innerHTML = '<strong>โหมดปักหมุดเพิ่มโครงการ:</strong> คลิกจุดใดก็ได้บนแผนที่เพื่อสร้างโครงการใหม่ตรงตำแหน่งนั้นทันที';
+            document.getElementById('projectMap').classList.add('map-picking-cursor');
+            showToast('คลิกตำแหน่งบนแผนที่เพื่อปักหมุดเพิ่มโครงการใหม่', 'info');
+        }
+
+        function cancelMapPicking() {
+            const wasModalPick = (mapPickingMode === 'MODAL_PICK');
+            mapPickingMode = null;
+            document.getElementById('mapPickingBanner').classList.add('hidden');
+            document.getElementById('projectMap').classList.remove('map-picking-cursor');
+            if (wasModalPick) {
+                openModal('projectModal');
+            }
+        }
+
+        function confirmDeleteProject(uid) {
+            const proj = projectsData.find(p => p.uid === uid);
+            if (!proj) return;
+
+            document.getElementById('confirmTitle').textContent = 'ยืนยันการลบโครงการ';
+            document.getElementById('confirmMessage').textContent = `คุณต้องการลบโครงการ "${proj.name}" ใช่หรือไม่?`;
+            const actionBtn = document.getElementById('confirmActionBtn');
+            actionBtn.onclick = () => {
+                projectsData = projectsData.filter(p => p.uid !== uid);
+                saveAppData();
+                renderStats();
+                renderAll();
+                closeModal('confirmModal');
+                showToast('ลบโครงการออกจากระบบแล้ว', 'warning');
+            };
+            openModal('confirmModal');
+        }
+
+        function openStatsModal() {
+            document.getElementById('editStatTotal').value = statsData.totalProjects;
+            document.getElementById('editStatCompleted').value = statsData.completedProjects;
+            document.getElementById('editStatPlanned').value = statsData.plannedProjects;
+            document.getElementById('editStatCapacity').value = statsData.capacity;
+            document.getElementById('editStatArea').value = statsData.area;
+            document.getElementById('editStatHouseholds').value = statsData.households;
+            document.getElementById('editStatReservoir').value = statsData.reservoirCount;
+            document.getElementById('editStatWeir').value = statsData.weirCount;
+            document.getElementById('editStatOther').value = statsData.otherCount;
+            openModal('statsModal');
+        }
+
+        function saveStatsForm(e) {
+            e.preventDefault();
+            statsData = {
+                totalProjects: Number(document.getElementById('editStatTotal').value),
+                completedProjects: Number(document.getElementById('editStatCompleted').value),
+                plannedProjects: Number(document.getElementById('editStatPlanned').value),
+                capacity: Number(document.getElementById('editStatCapacity').value),
+                area: Number(document.getElementById('editStatArea').value),
+                households: Number(document.getElementById('editStatHouseholds').value),
+                reservoirCount: Number(document.getElementById('editStatReservoir').value),
+                weirCount: Number(document.getElementById('editStatWeir').value),
+                otherCount: Number(document.getElementById('editStatOther').value)
+            };
+            saveAppData();
+            renderStats();
+            closeModal('statsModal');
+            showToast('อัปเดตตัวเลขสรุปสถิติเรียบร้อยแล้ว', 'success');
+        }
+
+        function confirmResetDefault() {
+            document.getElementById('confirmTitle').textContent = 'รีเซ็ตข้อมูลกลับเป็นค่าเริ่มต้น';
+            document.getElementById('confirmMessage').textContent = 'ข้อมูลหมวดหมู่และโครงการที่แก้ไขหรือเพิ่มใหม่ทั้งหมดจะถูกแทนที่ด้วยข้อมูลตั้งต้น ยืนยันหรือไม่?';
+            const actionBtn = document.getElementById('confirmActionBtn');
+            actionBtn.onclick = () => {
+                projectsData = JSON.parse(JSON.stringify(DEFAULT_PROJECTS));
+                statsData = JSON.parse(JSON.stringify(DEFAULT_STATS));
+                categoriesData = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+                currentCategory = 'ALL';
+                saveAppData();
+                renderStats();
+                renderAll();
+                closeModal('confirmModal');
+                showToast('คืนค่าข้อมูลเริ่มต้นทั้งหมดเรียบร้อยแล้ว', 'info');
+            };
+            openModal('confirmModal');
+        }
+
+        function exportDataJSON() {
+            const payload = {
+                exportedAt: new Date().toISOString(),
+                stats: statsData,
+                categories: categoriesData,
+                projects: projectsData
+            };
+            const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute('href', dataStr);
+            downloadAnchor.setAttribute('download', `uttaradit_royal_projects_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast('ส่งออกไฟล์สำรองข้อมูล JSON เรียบร้อยแล้ว', 'success');
+        }
+
+        function importDataJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (Array.isArray(parsed.projects)) {
+                        projectsData = parsed.projects;
+                        if (parsed.stats) statsData = parsed.stats;
+                        if (Array.isArray(parsed.categories) && parsed.categories.length > 0) {
+                            categoriesData = parsed.categories;
+                        }
+                        saveAppData();
+                        renderStats();
+                        renderAll();
+                        showToast(`นำเข้าข้อมูลสำเร็จ (${projectsData.length} โครงการ)`, 'success');
+                    } else {
+                        showToast('รูปแบบไฟล์ JSON ไม่ถูกต้อง', 'error');
+                    }
+                } catch (err) {
+                    showToast('เกิดข้อผิดพลาดในการอ่านไฟล์ JSON', 'error');
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        const searchInput = document.getElementById('searchInput');
+        const clearSearchBtn = document.getElementById('clearSearchBtn');
+        const districtFilter = document.getElementById('districtFilter');
+        const typeFilter = document.getElementById('typeFilter');
+        const resetAllBtn = document.getElementById('resetAllBtn');
+
+        searchInput.addEventListener('input', (e) => {
+            currentSearch = e.target.value;
+            clearSearchBtn.classList.toggle('hidden', currentSearch.length === 0);
+            renderAll();
+        });
+
+        clearSearchBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            currentSearch = '';
+            clearSearchBtn.classList.add('hidden');
+            searchInput.focus();
+            renderAll();
+        });
+
+        districtFilter.addEventListener('change', (e) => {
+            currentDistrict = e.target.value;
+            renderAll();
+        });
+
+        typeFilter.addEventListener('change', (e) => {
+            currentTypeFilter = e.target.value;
+            renderAll();
+        });
+
+        function resetFilters() {
+            currentCategory = 'ALL';
+            currentDistrict = 'ALL';
+            currentTypeFilter = 'ALL';
+            currentSearch = '';
+            searchInput.value = '';
+            districtFilter.value = 'ALL';
+            typeFilter.value = 'ALL';
+            clearSearchBtn.classList.add('hidden');
+
+            renderCategoryTabs();
+            renderAll();
+        }
+
+        resetAllBtn.addEventListener('click', resetFilters);
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSavedEmblem();
+            loadAppData();
+            initMap();
+            renderStats();
+            renderAll();
+        });
+    </script>
+</body>
+</html>
